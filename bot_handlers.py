@@ -371,6 +371,7 @@ async def process_youtube_link(message: Message, state: FSMContext):
 
     await state.update_data(video_url=url, video_id=video_id)
 
+    # Build category buttons from CATEGORIES list (already updated in config)
     category_buttons = []
     for i in range(0, len(CATEGORIES), 2):
         row = [
@@ -470,4 +471,4 @@ async def cancel_cleanup(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("Cleanup cancelled.")
     await call.answer()
-  
+    
