@@ -181,7 +181,7 @@ async def cmd_start(message: Message):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚀 Let's Go!", web_app={"url": "https://ojareridominion-prog.github.io/imagifhub/"})],
-        [InlineKeyboardButton(text="📢 Official Channel", url="https://t.me/imagifhub")]
+        [InlineKeyboardButton(text="📢 Official Channel", url="https://t.me/VidVids_channel")]
     ])
     await message.answer(
         "VidVids isn't just an app—it's your personal portal to a world of endless, breathtaking videos.\n\n"
