@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VidVids</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@telegram-apps/sdk@7.2.0/dist/core.min.js"></script>
+
+    <meta name="6a97888e-site-verification" content="dcdb9b639fb5730ac14653a93bf9469c">
+    
+    <!-- Monetag SDK – Interstitial (zone 10836321) -->
+    <script>
+    (function() {
+        const script = document.createElement('script');
+        script.src = 'https://libtl.com/sdk.js';
+        script.setAttribute('data-zone', '10836321');
+        script.setAttribute('data-sdk', 'show_10836321');
+        script.async = true;
+        document.head.appendChild(script);
+    })();
+    </script>
+
+    <!-- Monetag SDK – Rewarded Interstitial (zone 10836319) -->
+    <script>
+    (function() {
+        const script = document.createElement('script');
+        script.src = 'https://libtl.com/sdk.js';
+        script.setAttribute('data-zone', '10836319');
+        script.setAttribute('data-sdk', 'show_10836319');
+        script.async = true;
+        document.head.appendChild(script);
+    })();
+    </script>
+
+    <!-- TON Connect SDK v2 -->
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <link rel="ton-manifest" href="https://ojareridominion-prog.github.io/imagifhub/tonconnect-manifest.json">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="top-bar">
+        <button onclick="toggleMenu()" style="background:none; border:none; color:#fff; font-size:24px; padding:15px; cursor:pointer;">☰</button>
+        <h2 style="flex:1; text-align:center; font-size:16px; margin:0;">VidVids</h2>
+        <div id="premiumIndicator" style="display:none;">⭐</div>
+        <!-- Mute and search buttons removed -->
+    </div>
+
+    <div class="cat-bar" id="catBar"></div>
+
+    <!-- MENU OVERLAY (blur background) -->
+    <div id="menuOverlay" class="menu-overlay"></div>
+
+    <!-- MENU PANEL -->
+    <div id="menuPanel" class="menu-panel">
+        <a href="#" class="menu-link" onclick="toggleMenu()" style="color:var(--accent)">✕ Close Menu</a>
+        
+        <!-- USER INFO CARD -->
+        <div class="user-info-card" id="userInfoCard">
+            <div class="user-card-top">
+                <div class="user-avatar">
+                    <img id="userAvatar" src="assets/default-avatar.png" alt="User">
+                </div>
+                <div class="user-details">
+                    <div id="userName" class="user-name">Loading...</div>
+                    <div class="user-id-row">
+                        <span id="userId">-</span>
+                        <button id="copyIdBtn" onclick="copyUserId()">📋 Copy</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Wallet row will be inserted here by initWalletUI() -->
+        </div>
+
+        <!-- PAID PREMIUM CARD -->
+        <div class="premium-box">
+            <div style="font-weight: bold; font-size: 18px;">VIDVIDS PREMIUM ⭐</div>
+            <div id="premiumExpiryDisplay" style="font-size: 11px; opacity: 0.9; margin-top: 5px;">
+                Enjoy ad-free smooth scrolling
+            </div>
+            <button class="premium-btn-menu" onclick="openPremium()">UPGRADE NOW</button>
+        </div>
+
+        <!-- WATCH ADS CARD -->
+        <div id="watchAdsCard" class="premium-box" style="margin-top: 10px;">
+            <div style="font-weight: bold; font-size: 16px;">🎬 Watch Ads → 1h Premium</div>
+            <div id="watchAdsProgress" style="font-size: 14px; margin: 8px 0;">0/3 ads watched</div>
+            <div id="tempPremiumTimer" style="font-size: 12px; opacity: 0.9;"></div>
+            <button id="watchAdBtn" class="premium-btn-menu" style="background: white; color: #ff8c00; margin-top: 8px;">🎥 Watch Ad</button>
+        </div>
+
+        <!-- GIFT CARD IN MENU -->
+        <div id="giftCard" class="gift-card-menu" style="margin: 15px; padding: 15px; border-radius: 16px; color: white;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div><span style="font-size: 20px;">🎁</span> <strong>Send us a Gift</strong></div>
+                <button id="openGiftFromMenuBtn" style="background: white; border: none; padding: 6px 12px; border-radius: 20px; color: #ff4d6d; font-weight: bold;">Send Gift</button>
+            </div>
+            <div id="recentGiftContent" style="margin-top: 10px; font-size: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px;">
+                Loading...
+            </div>
+        </div>
+
+        <a href="#" class="menu-link" onclick="openCopyright()">⚖️ Copyright Policy</a>
+        <a href="#" class="menu-link" onclick="openPrivacy()">🔒 Privacy Policy</a>
+        <div class="menu-link" onclick="toggleDarkText()" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🌙 Dark Text</span>
+            <span id="darkTextIndicator">OFF</span>
+        </div>
+        <a href="#" class="menu-link" onclick="shareBot()">🔗 Share Bot with Friends</a>
+        <a href="https://t.me/imagifhub" class="menu-link">📢 Join Official Channel</a>
+        <a href="https://t.me/ojareridominion" class="menu-link">💬 Support</a>
+        
+        <!-- CUSTOM THEME ENGINE -->
+        <div style="padding:15px 25px 5px; font-size:12px; opacity:0.6;">CUSTOM THEME</div>
+        <div class="custom-theme-section">
+            <div class="theme-segmented" id="customThemeSegmented">
+                <button class="theme-seg-option active" data-mode="theme">Theme</button>
+                <button class="theme-seg-option" data-mode="accent">Accent</button>
+                <button class="theme-seg-option" data-mode="text">Text</button>
+            </div>
+            <div class="color-palette" id="colorPalette"></div>
+        </div>
+    </div>
+
+    <div id="swiper" class="swiper"><div class="swiper-wrapper" id="feed"></div></div>
+    
+    <!-- Audio element removed -->
+
+    <!-- PREMIUM MODAL -->
+    <div id="premiumModal" class="modal-overlay">
+        <div class="premium-card">
+            <h1>✨ VidVids Premium</h1>
+            
+            <!-- SEGMENTED TOGGLE for payment method -->
+            <div class="payment-segmented" id="premiumPaymentToggle">
+                <button class="seg-option active" data-payment="stars">⭐ Telegram Stars</button>
+                <button class="seg-option" data-payment="ton">💎 TON</button>
+            </div>
+
+            <div class="price-tag">
+                <span class="old-price stars-price">149 Stars</span>
+                <span class="old-price ton-price" style="display: none;" id="tonOldPrice">x TON</span>
+                <span class="new-price stars-price">99 Stars / 30 days</span>
+                <span class="new-price ton-price" style="display: none;" id="tonNewPrice">y TON / 30 days</span>
+            </div>
+            <ul class="premium-list">
+                <li>🚫 No ads</li>
+                <li>😁 Support VidVids</li>
+            </ul>
+            
+            <div style="background: rgba(255, 215, 0, 0.1); padding: 15px; border-radius: 10px; margin: 20px 0; text-align: center;">
+                <p id="paymentInfoText" style="margin: 0; font-size: 14px; opacity: 0.9;">
+                    🔒 <b>Secure Payment via Telegram</b><br>
+                    Clicking "Go Premium" will open Telegram chat.
+                </p>
+            </div>
+
+            <div id="paymentStatus" style="margin: 10px 0; font-size: 14px; text-align: center;"></div>
+            
+            <button id="btnBuy" class="btn-buy" onclick="goPremium()">Go Premium</button>
+            <button class="btn-close" onclick="closePremium()">Close</button>
+        </div>
+    </div>
+
+    <!-- COPYRIGHT MODAL (updated for video content) -->
+    <div id="copyrightModal" class="modal-overlay">
+        <div class="copyright-card">
+            <h2 style="margin-top:0;">⚖️ VidVids: Intellectual Property Policy</h2>
+            <div class="copyright-content scrollable">
+                <p><strong>1. Content Sources</strong><br>
+                VidVids is a video discovery platform. All video content is embedded from YouTube using their official embed API and complies with YouTube’s Terms of Service. We do not host or store any video files on our servers.</p>
+
+                <p><strong>2. No Background Music</strong><br>
+                VidVids does not play any background music. All audio comes exclusively from the YouTube videos that users choose to watch.</p>
+
+                <p><strong>3. Respect for Copyright</strong><br>
+                We respect the intellectual property rights of others. If you believe a YouTube video embedded in VidVids infringes your copyright, you should follow YouTube’s own copyright complaint process. Alternatively, you may contact us, and we will remove the embedded link upon proper notice.</p>
+
+                <p><strong>4. DMCA & Takedown Requests</strong><br>
+                If you are a copyright owner and believe that an embedded YouTube video violates your rights, please submit your claim via Telegram to <a href="https://t.me/ojareridominion" target="_blank">support</a> with the subject line: "Copyright Takedown Request."<br>
+                Please include:<br>
+                • The specific YouTube URL that appears in VidVids.<br>
+                • A description of the copyrighted work.<br>
+                • Your contact information.<br>
+                • A statement of good‑faith belief that the use is not authorised.</p>
+
+                <p><strong>5. Disclaimer</strong><br>
+                VidVids does not claim ownership of any YouTube content. All trademarks, brands, and video titles belong to their respective owners. We act solely as a neutral index and do not control the content of embedded videos.</p>
+            </div>
+            <button class="btn-close" onclick="closeCopyright()">Close</button>
+        </div>
+    </div>
+
+    <!-- PRIVACY POLICY MODAL (updated) -->
+    <div id="privacyModal" class="modal-overlay">
+        <div class="copyright-card">
+            <h2 style="margin-top:0;">🔒 Privacy Policy</h2>
+            <div class="copyright-content scrollable">
+                <p><strong>Data We Collect</strong><br>
+                When you use VidVids, we may collect the following information:</p>
+                <ul>
+                    <li><strong>Telegram User Data:</strong> Your Telegram user ID, username, first name, last name (if provided), and profile photo (if accessible).</li>
+                    <li><strong>Premium Status:</strong> Whether you have purchased a premium subscription, along with the expiration date of your premium access.</li>
+                    <li><strong>Payment Records:</strong> Transaction IDs, amount paid, currency, and timestamp of successful payments (for premium purchases).</li>
+                    <li><strong>Ad Interaction:</strong> Number of ads watched per day and the timestamp of the last ad viewed (used to enforce cooldown and daily limits).</li>
+                    <li><strong>Usage Data:</strong> Categories you browse, search queries (if any), and video view history (stored locally on your device).</li>
+                </ul>
+
+                <p><strong>How We Use Your Data</strong><br>
+                Your information is used solely to:</p>
+                <ul>
+                    <li>Provide and maintain the core functionality of the mini app.</li>
+                    <li>Manage premium subscriptions and deliver ad‑free experiences to paying users.</li>
+                    <li>Serve relevant ads and limit ad frequency to respect your experience.</li>
+                    <li>Improve content discovery and app performance.</li>
+                    <li>Respond to support inquiries or copyright claims.</li>
+                </ul>
+
+                <p><strong>Data Sharing</strong><br>
+                We do <strong>not</strong> sell or rent your personal data to third parties. We may share limited data (e.g., user ID) with our payment provider (Telegram Stars) to complete transactions. Aggregated, anonymised statistics may be used for internal analytics.</p>
+
+                <p><strong>Data Retention</strong><br>
+                Your Telegram user data is retained as long as you use the app. Premium records are kept for financial and legal compliance. You may request deletion of your data by contacting support.</p>
+
+                <p><strong>Your Rights</strong><br>
+                You have the right to access, correct, or delete your personal data. To exercise these rights, please contact us via Telegram <a href="https://t.me/ojareridominion" target="_blank">support</a>.</p>
+
+                <p><strong>Changes to This Policy</strong><br>
+                We may update this Privacy Policy from time to time. Continued use of the app constitutes acceptance of the revised policy.</p>
+
+                <p><em>Last updated: May 2026</em></p>
+            </div>
+            <button class="btn-close" onclick="closePrivacy()">Close</button>
+        </div>
+    </div>
+
+    <!-- DRAWER OVERLAY (blur background for gift drawer) -->
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+
+    <!-- GIFT DRAWER (slide from bottom with drag handle) -->
+    <div id="giftDrawer" class="gift-drawer">
+        <div class="drawer-drag-handle" id="drawerDragHandle"></div>
+        <div class="gift-drawer-header">
+            <h3>🎁 Send us a Gift</h3>
+            <!-- Horizontally scrollable category filters -->
+            <div id="giftCategoryFilters" class="gift-category-filters-scroll"></div>
+        </div>
+        <div class="gift-drawer-body" id="giftDrawerContent">
+            <div class="gift-loading">Loading gifts...</div>
+        </div>
+    </div>
+
+    <div id="welcomeOverlay" class="welcome-overlay">
+        <div class="overlay-content">
+            <button id="welcomeContinueBtn" class="welcome-button">CONTINUE 🚀</button>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+    <script type="module" src="giftManager.js"></script>
+    
+</body>
+  </html>
+  
