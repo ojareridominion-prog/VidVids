@@ -9,7 +9,6 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_IDS_RAW = os.environ.get("ADMIN_ID", "")
 # Parse comma-separated admin IDs, e.g., "6403924487,1234567890"
 ADMIN_IDS = [int(x.strip()) for x in ADMIN_IDS_RAW.split(",") if x.strip().isdigit()]
-IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
