@@ -1,17 +1,16 @@
 // feedManager.js
 import { state } from './state.js';
-import { getSeenList, trackSeenImage, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+import { getSeenList, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 import { buildSlides, showMonetagInterstitial } from './adsManager.js';
 
 const API_URL = "https://imagifhub.onrender.com";
 const PAGE_SIZE = 30;
 const MAX_RETRIES = 3;
-const AD_FREQUENCY = 3; // same as in adsManager
+const AD_FREQUENCY = 3;
 
-// Helper: convert YouTube URL to embedded player URL with autoplay, loop, controls disabled
+// Helper: convert YouTube URL to embedded player URL with autoplay, loop, controls disabled, and JS API enabled
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
-    // Handle youtu.be/ID or youtube.com/watch?v=ID or youtube.com/shorts/ID
     const patterns = [
         /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/,
         /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)/,
@@ -25,24 +24,16 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
-    // Embed with required parameters: autoplay=1, loop=1, playlist=videoId, controls=0, modestbranding=1, playsinline=1
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0`;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
-// Helper: pause all iframe videos (global function called from script.js/overlayMonitor)
+// Global pause function (defined in script.js) – use it
 function pauseAllVideos() {
     if (window.pauseAllVideos && typeof window.pauseAllVideos === 'function') {
         window.pauseAllVideos();
-    } else {
-        // fallback: iterate iframes and send pause command
-        const iframes = document.querySelectorAll('iframe');
-        iframes.forEach(iframe => {
-            iframe.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-        });
     }
 }
 
-// Helper: play a specific iframe video
 function playIframeVideo(iframe) {
     if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
@@ -64,7 +55,6 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
             return [];
         }
         
-        // For search: ignore localStorage seen history, only filter by current session
         const isSearchActive = search && search.trim().length > 0;
         let seenHistory = new Set();
         if (!isSearchActive) {
@@ -92,7 +82,7 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         filtered.forEach(img => state.sessionSeenUrls.add(img.url));
         return filtered;
     } catch (e) {
-        console.error("Error fetching random images:", e);
+        console.error("Error fetching random videos:", e);
         return [];
     } finally {
         state.isLoadingMore = false;
@@ -107,16 +97,12 @@ function escapeHtml(str) {
         if (m === '<') return '&lt;';
         if (m === '>') return '&gt;';
         return m;
-    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-        return c;
     });
 }
 
-// VIDEO slide: embedded YouTube iframe, no overlays or keywords
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
-        // fallback: show error message
         return `
             <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
                 <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; color:#fff;">
@@ -165,7 +151,6 @@ async function appendMoreImages(newImages) {
         const img = newImages[i];
         htmlSlides.push(generateVideoSlide(img));
 
-        // Insert native ad after every AD_FREQUENCY videos (continuing pattern)
         const position = oldImageCount + i + 1;
         if (!state.isPremiumUser && position % AD_FREQUENCY === 0) {
             const ad = state.nativeAds[localAdIndex % state.nativeAds.length];
@@ -200,8 +185,8 @@ function renderSlides(slides) {
     state.activeSwiper = new Swiper('#swiper', {
         direction: 'vertical',
         mousewheel: true,
-        effect: 'slide',               // normal slide effect (no fade)
-        speed: 300,                    // faster transition
+        effect: 'slide',
+        speed: 300,
         on: {
             reachEnd: async () => {
                 if (state.activeSearchQuery) return;
@@ -209,29 +194,23 @@ function renderSlides(slides) {
                 await loadMoreImages(true);
             },
             slideChange: function () {
-                // Pause all videos first
                 pauseAllVideos();
                 
                 const activeSlide = this.slides[this.activeIndex];
                 if (activeSlide && activeSlide.dataset.type === 'video') {
                     const iframe = activeSlide.querySelector('iframe');
                     if (iframe) {
-                        // Small delay to ensure the slide is fully active
-                        setTimeout(() => {
-                            playIframeVideo(iframe);
-                        }, 50);
+                        setTimeout(() => playIframeVideo(iframe), 50);
                     }
-                    // Track seen URL for deduplication (same as before)
-                    const url = activeSlide.dataset.url;
-                    if (url) trackSeenImage(url);
                 }
                 
-                // Show interstitial ad after 15 videos for non‑premium users
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
                     if (state.imagesShownSinceLastAd >= 15) {
                         state.imagesShownSinceLastAd = 0;
                         this.allowTouchMove = false;
+                        // Pause videos before showing ad
+                        pauseAllVideos();
                         showMonetagInterstitial().finally(() => { this.allowTouchMove = true; });
                     }
                 }
@@ -243,8 +222,6 @@ function renderSlides(slides) {
                     if (iframe) {
                         setTimeout(() => playIframeVideo(iframe), 100);
                     }
-                    const url = activeSlide.dataset.url;
-                    if (url) trackSeenImage(url);
                 }
             }
         }
@@ -271,14 +248,16 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
     state.currentAdIndex = 0;
     const shouldShowAd = !state.isPremiumUser && !skipAd && !state.activeSearchQuery;
     if (shouldShowAd) {
-        try { await showMonetagInterstitial(); } catch (e) { console.warn(e); }
+        try {
+            pauseAllVideos();
+            await showMonetagInterstitial();
+        } catch (e) { console.warn(e); }
     }
     state.activeSearchQuery = search || "";
     state.currentCategory = cat;
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
     
     const feed = document.getElementById('feed');
-    // Skeleton loading (unchanged)
     feed.innerHTML = `
         <div class="skeleton-wrapper">
             <div class="skeleton-slide">
@@ -311,4 +290,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-          }
+}
