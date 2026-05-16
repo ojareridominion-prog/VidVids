@@ -11,7 +11,7 @@ import { initOverlayMonitor } from './overlayMonitor.js';
 
 const API_URL = "https://imagifhub.onrender.com";
 
-// ---------- CATEGORIES (replaces music.js) ----------
+// ---------- CATEGORIES ----------
 export const categories = [
     "Discover",
     "Cinema & Fiction",
@@ -42,7 +42,7 @@ window.copyUserId = copyUserId;
 window.openPrivacy = openPrivacy;
 window.closePrivacy = closePrivacy;
 
-// Global function to pause all YouTube videos (used by overlayMonitor and slideChange)
+// Global function to pause all YouTube videos (used by overlayMonitor and feedManager)
 window.pauseAllVideos = function() {
     const iframes = document.querySelectorAll('.swiper-slide iframe');
     iframes.forEach(iframe => {
@@ -114,7 +114,6 @@ async function goPremium() {
 }
 window.goPremium = goPremium;
 
-// ---------- MANUAL PREMIUM CHECK BUTTON (inside modal) ----------
 function addManualPremiumCheck() {
     const premiumCard = document.querySelector('.premium-card');
     if (premiumCard) {
@@ -138,7 +137,6 @@ function addManualPremiumCheck() {
     }
 }
 
-// ---------- WATCH ADS CARD (temp premium) ----------
 function initWatchAdButton() {
     const watchAdBtn = document.getElementById('watchAdBtn');
     if (watchAdBtn) {
@@ -147,7 +145,11 @@ function initWatchAdButton() {
             if (watchAdBtn.disabled) return;
             watchAdBtn.disabled = true;
             watchAdBtn.innerText = "⏳ Loading ad...";
-            try { await premiumRewardedWrapper(); } catch (err) { console.error(err); }
+            try {
+                // Pause videos before showing rewarded ad
+                window.pauseAllVideos();
+                await premiumRewardedWrapper();
+            } catch (err) { console.error(err); }
             finally {
                 watchAdBtn.disabled = false;
                 watchAdBtn.innerText = "🎥 Watch Ad";
@@ -156,7 +158,6 @@ function initWatchAdButton() {
     }
 }
 
-// ---------- PREMIUM MODAL SEGMENTED TOGGLE (Stars / TON) ----------
 function initPremiumPaymentToggle() {
     const toggleContainer = document.getElementById('premiumPaymentToggle');
     if (!toggleContainer) return;
@@ -216,7 +217,6 @@ function initPremiumPaymentToggle() {
     }
 }
 
-// ---------- MAIN INITIALIZATION (after welcome overlay) ----------
 async function initializeApp() {
     const tg = window.Telegram.WebApp;
     if (tg && tg.expand) tg.expand();
@@ -225,7 +225,6 @@ async function initializeApp() {
         await fetchNativeAds();
     } catch (e) { console.warn("fetchNativeAds error:", e); }
 
-    // Build category bar (using new categories)
     const catBar = document.getElementById('catBar');
     if (catBar) {
         catBar.innerHTML = categories.map(c => 
@@ -250,17 +249,13 @@ async function initializeApp() {
         await initWalletUI();
     } catch (e) { console.warn("Wallet UI init error:", e); }
 
-    // Initialize overlay monitor (pauses videos on any overlay)
     initOverlayMonitor(window.pauseAllVideos);
 
-    // Verify premium status WITHOUT triggering feed reload
     await verifyPremiumStatus(true);
 
-    // Finally load the feed
     await loadFeed("Discover", "", true);
 }
 
-// ---------- WELCOME OVERLAY (triggers autoplay permission) ----------
 window.onload = () => {
     const welcomeOverlay = document.getElementById('welcomeOverlay');
     const continueBtn = document.getElementById('welcomeContinueBtn');
@@ -283,12 +278,10 @@ window.onload = () => {
         initializeApp();
     }
     
-    // Set festive title
     const titleElem = document.querySelector('.top-bar h2');
     if (titleElem) titleElem.innerText = getFestiveTitle();
 };
 
-// ---------- GLOBAL CLICK HANDLER FOR JOIN BUTTONS (anti-spoof) ----------
 document.addEventListener('click', (e) => {
     const target = e.target.closest('a, button, [role="button"]');
     if (!target) return;
@@ -303,5 +296,3 @@ document.addEventListener('click', (e) => {
         }
     }
 });
-
-// No DOMContentLoaded actions – everything waits for CONTINUE
