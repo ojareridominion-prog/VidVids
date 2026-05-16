@@ -180,7 +180,7 @@ async def cmd_start(message: Message):
     await send_banner_ad(message.chat.id, telegram_id)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚀 Let's Go!", web_app={"url": "https://ojareridominion-prog.github.io/imagifhub/"})],
+        [InlineKeyboardButton(text="🚀 Let's Go!", web_app={"url": "https://ojareridominion-prog.github.io/VidVids/"})],
         [InlineKeyboardButton(text="📢 Official Channel", url="https://t.me/VidVids_channel")]
     ])
     await message.answer(
