@@ -398,7 +398,6 @@ async def set_video_category(call: CallbackQuery, state: FSMContext):
         supabase.table("media_content").insert({
             "url": video_url,
             "category": category,
-            "Keyword": ""   # Empty string – no keywords
         }).execute()
         await call.message.edit_text(f"✅ Video added successfully to category <b>{category}</b>!", parse_mode="HTML")
     except Exception as e:
