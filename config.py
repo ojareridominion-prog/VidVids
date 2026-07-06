@@ -20,7 +20,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Constants
 CATEGORIES = [
-    "Discover", "Cinema & Fiction", "Humor & Diverting", "STEM & Tech",
+    "Extra", "Cinema & Fiction", "Humor & Diverting", "STEM & Tech",
     "Design & Creative", "Music & Performance", "Sports & Fitness",
     "History & Archive", "Lifestyle & Travels", "Gaming & Hobby",
     "Nature & Animals"
