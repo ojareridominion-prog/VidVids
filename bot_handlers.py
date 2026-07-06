@@ -11,16 +11,15 @@ from config import bot, dp, supabase, CATEGORIES
 from ad_utils import send_banner_ad
 from gifts_data import GIFTS
 
-# Debug: print the ADMIN_IDS from config (will show if it's empty)
-from config import ADMIN_IDS as CONFIG_ADMIN_IDS
-logging.info(f"ADMIN_IDS from config: {CONFIG_ADMIN_IDS}")
-
-# Helper to get admin IDs from env (as a fallback)
-def get_admin_ids_from_env():
+# ---------- Admin ID(s) from environment directly ----------
+def get_admin_ids():
     raw = os.environ.get("ADMIN_ID", "")
     return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
 
-# ==================== STATES FOR VIDEO UPLOAD ====================
+def is_admin(user_id: int) -> bool:
+    return user_id in get_admin_ids()
+
+# ==================== STATES ====================
 class AdminUpload(StatesGroup):
     waiting_link = State()
     waiting_category = State()
@@ -32,7 +31,6 @@ class BrokenState(StatesGroup):
 
 @dp.pre_checkout_query()
 async def on_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
-    """Required handler – answer within 10 seconds"""
     try:
         logging.info(f"📦 Pre-checkout query: id={pre_checkout_query.id}, user={pre_checkout_query.from_user.id}")
         await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
@@ -41,14 +39,12 @@ async def on_pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
 
 @dp.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
 async def on_successful_payment(message: Message):
-    """Handle successful payment – gifts or premium."""
     try:
         payment = message.successful_payment
         telegram_id = message.from_user.id
         payload = payment.invoice_payload
         now = datetime.utcnow()
 
-        # --- Check if this is a GIFT payment ---
         if payload.startswith("gift_"):
             parts = payload.split("_")
             if len(parts) >= 3:
@@ -106,7 +102,7 @@ async def on_successful_payment(message: Message):
                     )
                 return
 
-        # --- Premium payment ---
+        # Premium payment
         logging.info(f"💰 Successful premium payment from user {telegram_id}, amount={payment.total_amount} {payment.currency}")
 
         user_result = supabase.table("users").select("premium_expires_at").eq("telegram_id", telegram_id).execute()
@@ -319,7 +315,6 @@ async def start_premium(message: Message):
 # ==================== ADMIN COMMANDS ====================
 
 def extract_youtube_id(url: str):
-    """Extract YouTube video ID from various URL formats."""
     patterns = [
         r"(?:v=|\/)([0-9A-Za-z_-]{11})(?:[?&]|$)",
         r"(?:embed\/)([0-9A-Za-z_-]{11})",
@@ -332,7 +327,6 @@ def extract_youtube_id(url: str):
     return None
 
 async def is_youtube_video_accessible(url: str) -> bool:
-    """Check if a YouTube video exists and is accessible (not deleted/private)."""
     try:
         oembed_url = f"https://www.youtube.com/oembed?url={url}&format=json"
         async with aiohttp.ClientSession() as session:
@@ -341,11 +335,7 @@ async def is_youtube_video_accessible(url: str) -> bool:
     except Exception:
         return False
 
-# Helper to check admin – uses env directly to avoid config import issues
-def is_admin(user_id: int) -> bool:
-    admin_ids = get_admin_ids_from_env()
-    return user_id in admin_ids
-
+# ---------- Admin commands with direct env check ----------
 @dp.message(F.text == "/admin")
 async def admin_cmd(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -396,7 +386,6 @@ async def process_youtube_link(message: Message, state: FSMContext):
 
     await state.update_data(video_url=url, video_id=video_id)
 
-    # Build category buttons from CATEGORIES list
     category_buttons = []
     for i in range(0, len(CATEGORIES), 2):
         row = [
@@ -426,7 +415,7 @@ async def set_video_category(call: CallbackQuery, state: FSMContext):
         supabase.table("media_content").insert({
             "url": video_url,
             "category": category,
-            "Keyword": ""   # Empty string – no keywords
+            "Keyword": ""
         }).execute()
         await call.message.edit_text(f"✅ Video added successfully to category <b>{category}</b>!", parse_mode="HTML")
     except Exception as e:
@@ -471,7 +460,7 @@ async def check_broken_links(call: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🗑️ Cleanup All Broken", callback_data="cleanup_broken")],
         [InlineKeyboardButton(text="Cancel", callback_data="cancel_cleanup")]
-    ])
+  ])
     await state.set_state(BrokenState.waiting_cleanup)
     await state.update_data(broken_ids=[rec["id"] for rec in broken])
     await call.message.edit_text(message_text, reply_markup=keyboard)
@@ -508,4 +497,3 @@ async def cancel_cleanup(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("Cleanup cancelled.")
     await call.answer()
-    
