@@ -306,6 +306,10 @@ async def renew_premium_callback(call: CallbackQuery):
 async def start_premium(message: Message):
     await cmd_premium(message)
 
+@dp.message()
+async def log_all_messages(message: Message):
+    logging.info(f"Received: {message.text} from {message.from_user.id}")
+
 # ==================== ADMIN COMMANDS ====================
 
 def extract_youtube_id(url: str):
