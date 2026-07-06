@@ -10,6 +10,8 @@ from config import bot, dp, supabase, ADMIN_IDS, CATEGORIES
 from ad_utils import send_banner_ad
 from gifts_data import GIFTS
 
+logging.info(f"ADMIN_IDS loaded in bot_handlers: {ADMIN_IDS}")
+
 # ==================== STATES FOR VIDEO UPLOAD ====================
 class AdminUpload(StatesGroup):
     waiting_link = State()
@@ -306,10 +308,6 @@ async def renew_premium_callback(call: CallbackQuery):
 async def start_premium(message: Message):
     await cmd_premium(message)
 
-@dp.message()
-async def log_all_messages(message: Message):
-    logging.info(f"Received: {message.text} from {message.from_user.id}")
-
 # ==================== ADMIN COMMANDS ====================
 
 def extract_youtube_id(url: str):
@@ -335,8 +333,12 @@ async def is_youtube_video_accessible(url: str) -> bool:
     except Exception:
         return False
 
-@dp.message(F.from_user.id.in_(ADMIN_IDS), F.text == "/admin")
+# ADMIN COMMAND – manual check inside to avoid filter issues
+@dp.message(F.text == "/admin")
 async def admin_cmd(message: Message, state: FSMContext):
+    if message.from_user.id not in ADMIN_IDS:
+        logging.warning(f"Unauthorized /admin attempt by {message.from_user.id}")
+        return
     await state.clear()
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Upload Video", callback_data="upload_video")],
@@ -346,12 +348,20 @@ async def admin_cmd(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data == "upload_video")
 async def upload_video_start(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Unauthorized", show_alert=True)
+        return
     await call.message.edit_text("Please send the YouTube link (URL) of the video/short you want to add.")
     await state.set_state(AdminUpload.waiting_link)
     await call.answer()
 
 @dp.message(AdminUpload.waiting_link, F.text)
 async def process_youtube_link(message: Message, state: FSMContext):
+    # This handler is only reached after the state is set, but we also need admin check
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("Unauthorized.")
+        await state.clear()
+        return
     url = message.text.strip()
     video_id = extract_youtube_id(url)
     if not video_id:
@@ -390,6 +400,9 @@ async def process_youtube_link(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("setcat_"), AdminUpload.waiting_category)
 async def set_video_category(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Unauthorized", show_alert=True)
+        return
     category = call.data.split("_", 1)[1]
     user_data = await state.get_data()
     video_url = user_data.get("video_url")
@@ -414,6 +427,9 @@ async def set_video_category(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "check_broken")
 async def check_broken_links(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Unauthorized", show_alert=True)
+        return
     await call.answer("Checking...")
     try:
         result = supabase.table("media_content").select("id, url").execute()
@@ -452,6 +468,9 @@ async def check_broken_links(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "cleanup_broken")
 async def cleanup_broken_links(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Unauthorized", show_alert=True)
+        return
     data = await state.get_data()
     broken_ids = data.get("broken_ids", [])
     if not broken_ids:
@@ -472,6 +491,9 @@ async def cleanup_broken_links(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "cancel_cleanup")
 async def cancel_cleanup(call: CallbackQuery, state: FSMContext):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Unauthorized", show_alert=True)
+        return
     await state.clear()
     await call.message.edit_text("Cleanup cancelled.")
     await call.answer()
