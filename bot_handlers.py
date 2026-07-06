@@ -1,3 +1,4 @@
+import os
 import re
 import logging
 from datetime import datetime, timedelta
@@ -6,11 +7,18 @@ from aiogram import F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, PreCheckoutQuery, ContentType, LabeledPrice
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from config import bot, dp, supabase, ADMIN_IDS, CATEGORIES
+from config import bot, dp, supabase, CATEGORIES
 from ad_utils import send_banner_ad
 from gifts_data import GIFTS
 
-logging.info(f"ADMIN_IDS loaded in bot_handlers: {ADMIN_IDS}")
+# Debug: print the ADMIN_IDS from config (will show if it's empty)
+from config import ADMIN_IDS as CONFIG_ADMIN_IDS
+logging.info(f"ADMIN_IDS from config: {CONFIG_ADMIN_IDS}")
+
+# Helper to get admin IDs from env (as a fallback)
+def get_admin_ids_from_env():
+    raw = os.environ.get("ADMIN_ID", "")
+    return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
 
 # ==================== STATES FOR VIDEO UPLOAD ====================
 class AdminUpload(StatesGroup):
@@ -333,10 +341,14 @@ async def is_youtube_video_accessible(url: str) -> bool:
     except Exception:
         return False
 
-# ADMIN COMMAND – manual check inside to avoid filter issues
+# Helper to check admin – uses env directly to avoid config import issues
+def is_admin(user_id: int) -> bool:
+    admin_ids = get_admin_ids_from_env()
+    return user_id in admin_ids
+
 @dp.message(F.text == "/admin")
 async def admin_cmd(message: Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
+    if not is_admin(message.from_user.id):
         logging.warning(f"Unauthorized /admin attempt by {message.from_user.id}")
         return
     await state.clear()
@@ -348,7 +360,7 @@ async def admin_cmd(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data == "upload_video")
 async def upload_video_start(call: CallbackQuery, state: FSMContext):
-    if call.from_user.id not in ADMIN_IDS:
+    if not is_admin(call.from_user.id):
         await call.answer("Unauthorized", show_alert=True)
         return
     await call.message.edit_text("Please send the YouTube link (URL) of the video/short you want to add.")
@@ -357,8 +369,7 @@ async def upload_video_start(call: CallbackQuery, state: FSMContext):
 
 @dp.message(AdminUpload.waiting_link, F.text)
 async def process_youtube_link(message: Message, state: FSMContext):
-    # This handler is only reached after the state is set, but we also need admin check
-    if message.from_user.id not in ADMIN_IDS:
+    if not is_admin(message.from_user.id):
         await message.answer("Unauthorized.")
         await state.clear()
         return
@@ -385,7 +396,7 @@ async def process_youtube_link(message: Message, state: FSMContext):
 
     await state.update_data(video_url=url, video_id=video_id)
 
-    # Build category buttons from CATEGORIES list (already updated in config)
+    # Build category buttons from CATEGORIES list
     category_buttons = []
     for i in range(0, len(CATEGORIES), 2):
         row = [
@@ -400,7 +411,7 @@ async def process_youtube_link(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("setcat_"), AdminUpload.waiting_category)
 async def set_video_category(call: CallbackQuery, state: FSMContext):
-    if call.from_user.id not in ADMIN_IDS:
+    if not is_admin(call.from_user.id):
         await call.answer("Unauthorized", show_alert=True)
         return
     category = call.data.split("_", 1)[1]
@@ -427,7 +438,7 @@ async def set_video_category(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "check_broken")
 async def check_broken_links(call: CallbackQuery, state: FSMContext):
-    if call.from_user.id not in ADMIN_IDS:
+    if not is_admin(call.from_user.id):
         await call.answer("Unauthorized", show_alert=True)
         return
     await call.answer("Checking...")
@@ -449,8 +460,7 @@ async def check_broken_links(call: CallbackQuery, state: FSMContext):
         if not accessible:
             broken.append(rec)
 
-    if not broken:
-        await call.message.edit_text("✅ All videos are accessible. No broken links found.")
+    if not broken:await call.message.edit_text("✅ All videos are accessible. No broken links found.")
         return
 
     broken_list_text = "\n".join([f"• {rec['url']}" for rec in broken[:10]])
@@ -468,7 +478,7 @@ async def check_broken_links(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "cleanup_broken")
 async def cleanup_broken_links(call: CallbackQuery, state: FSMContext):
-    if call.from_user.id not in ADMIN_IDS:
+    if not is_admin(call.from_user.id):
         await call.answer("Unauthorized", show_alert=True)
         return
     data = await state.get_data()
@@ -491,10 +501,9 @@ async def cleanup_broken_links(call: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "cancel_cleanup")
 async def cancel_cleanup(call: CallbackQuery, state: FSMContext):
-    if call.from_user.id not in ADMIN_IDS:
+    if not is_admin(call.from_user.id):
         await call.answer("Unauthorized", show_alert=True)
         return
     await state.clear()
     await call.message.edit_text("Cleanup cancelled.")
     await call.answer()
-    
