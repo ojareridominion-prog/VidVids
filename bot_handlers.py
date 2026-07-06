@@ -460,7 +460,8 @@ async def check_broken_links(call: CallbackQuery, state: FSMContext):
         if not accessible:
             broken.append(rec)
 
-    if not broken:await call.message.edit_text("✅ All videos are accessible. No broken links found.")
+    if not broken:
+        await call.message.edit_text("✅ All videos are accessible. No broken links found.")
         return
 
     broken_list_text = "\n".join([f"• {rec['url']}" for rec in broken[:10]])
@@ -507,3 +508,4 @@ async def cancel_cleanup(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text("Cleanup cancelled.")
     await call.answer()
+    
