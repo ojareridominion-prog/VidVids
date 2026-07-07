@@ -193,7 +193,13 @@ body.dark-text .description-text {
 }
 
 /* Swiper Container */
-#swiper { position:absolute; top:104px; bottom:0; width:100%; z-index:10; }
+#swiper { 
+    position: absolute;
+    top: 104px;
+    height: calc(100% - 104px); /* instead of bottom:0 */
+    width: 100%;
+    z-index: 10;
+}
 .swiper-slide { position: relative; width: 100%; height: 100%; }
 /* YouTube embed fullscreen inside slide */
 .swiper-slide iframe {
