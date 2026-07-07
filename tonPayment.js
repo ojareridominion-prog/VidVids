@@ -6,7 +6,7 @@ let walletConnected = false;
 let walletAddress = null;
 let initializationPromise = null;
 
-const API_URL = "https://imagifhub.onrender.com";
+const API_URL = "https://vidvids.onrender.com";
 const MANIFEST_URL = `${API_URL}/ton-manifest.json`;
 
 async function loadTonWeb() {
