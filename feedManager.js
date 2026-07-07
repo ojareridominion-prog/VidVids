@@ -24,7 +24,7 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
 // Global pause function (defined in script.js) – use it
