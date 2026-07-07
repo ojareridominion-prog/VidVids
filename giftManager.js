@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { verifyPremiumStatus } from './premiumManager.js';
 
-const API_URL = "https://imagifhub.onrender.com";
+const API_URL = "https://vidvids.onrender.com";
 
 let giftList = [];
 let currentGiftDrawerOpen = false;
