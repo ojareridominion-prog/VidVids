@@ -8,7 +8,7 @@ const PAGE_SIZE = 30;
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
-// Helper: convert YouTube URL to embedded player URL with autoplay, loop, controls disabled, and JS API enabled
+// Helper: convert YouTube URL to embedded player URL with autoplay initially OFF
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
     const patterns = [
@@ -24,6 +24,7 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
+    // autoplay=0, loop=1, controls=0, modestbranding=1, playsinline=1, rel=0, showinfo=0, enablejsapi=1
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
@@ -139,6 +140,30 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
+// ---------- New: manage video playback (only active slide gets autoplay=1) ----------
+function manageVideoPlayback(swiperInstance) {
+    if (!swiperInstance) return;
+    const slides = swiperInstance.slides;
+    const activeIndex = swiperInstance.activeIndex;
+
+    slides.forEach((slide, idx) => {
+        const iframe = slide.querySelector('iframe');
+        if (!iframe) return;
+        let src = iframe.src;
+        // Toggle autoplay based on active status
+        const shouldPlay = (idx === activeIndex);
+        if (shouldPlay) {
+            if (!src.includes('autoplay=1')) {
+                iframe.src = src.replace(/autoplay=\d/, 'autoplay=1');
+            }
+        } else {
+            if (src.includes('autoplay=1')) {
+                iframe.src = src.replace(/autoplay=\d/, 'autoplay=0');
+            }
+        }
+    });
+}
+
 async function appendMoreImages(newImages) {
     if (!state.activeSwiper || newImages.length === 0) return false;
 
@@ -168,11 +193,22 @@ async function appendMoreImages(newImages) {
     state.allImages.push(...newImages);
     newImages.forEach(img => state.sessionSeenUrls.add(img.url));
 
+    // After appending, ensure active slide video is playing
+    setTimeout(() => manageVideoPlayback(swiper), 100);
     return true;
 }
 
 function renderSlides(slides) {
     const feed = document.getElementById('feed');
+    if (!feed) return;
+
+    // 1. Destroy existing Swiper instance if any
+    if (state.activeSwiper) {
+        state.activeSwiper.destroy(true, true);
+        state.activeSwiper = null;
+    }
+
+    // 2. Replace content with new slides
     feed.innerHTML = slides.map(slide => {
         if (slide.type === 'image') {
             return generateVideoSlide(slide.item);
@@ -181,12 +217,14 @@ function renderSlides(slides) {
         }
     }).join('');
 
-    if (state.activeSwiper) state.activeSwiper.destroy(true, true);
+    // 3. Initialize new Swiper
     state.activeSwiper = new Swiper('#swiper', {
         direction: 'vertical',
         mousewheel: true,
         effect: 'slide',
         speed: 300,
+        observer: true,          // Watch for DOM changes
+        observeParents: true,    // Watch parent container changes
         on: {
             reachEnd: async () => {
                 if (state.activeSearchQuery) return;
@@ -194,30 +232,28 @@ function renderSlides(slides) {
                 await loadMoreImages(true);
             },
             slideChange: function () {
+                // Pause all via the global function (legacy)
                 pauseAllVideos();
-                
-                const activeSlide = this.slides[this.activeIndex];
-                if (activeSlide && activeSlide.dataset.type === 'video') {
-                    const iframe = activeSlide.querySelector('iframe');
-                    if (iframe) {
-                        setTimeout(() => playIframeVideo(iframe), 50);
-                    }
-                }
-                
+                // Manage autoplay state per slide
+                manageVideoPlayback(this);
+
+                // Interstitial ad logic (unchanged)
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
                     if (state.imagesShownSinceLastAd >= 15) {
                         state.imagesShownSinceLastAd = 0;
                         this.allowTouchMove = false;
-                        // Pause videos before showing ad
-                        pauseAllVideos();
+                        pauseAllVideos(); // extra safety
                         showMonetagInterstitial().finally(() => { this.allowTouchMove = true; });
                     }
                 }
             },
             init: function () {
+                // Ensure first slide plays
+                manageVideoPlayback(this);
+                // Also play via postMessage as a fallback
                 const activeSlide = this.slides[this.activeIndex];
-                if (activeSlide && activeSlide.dataset.type === 'video') {
+                if (activeSlide) {
                     const iframe = activeSlide.querySelector('iframe');
                     if (iframe) {
                         setTimeout(() => playIframeVideo(iframe), 100);
@@ -226,6 +262,11 @@ function renderSlides(slides) {
             }
         }
     });
+
+    // Force update after a tiny delay to ensure layout
+    setTimeout(() => {
+        if (state.activeSwiper) state.activeSwiper.update();
+    }, 100);
 }
 
 export async function loadMoreImages(preservePosition = false) {
