@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { getSeenList, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 import { buildSlides, showMonetagInterstitial } from './adsManager.js';
 
-const API_URL = "https://imagifhub.onrender.com";
+const API_URL = "https://vidvids.onrender.com";
 const PAGE_SIZE = 30;
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
