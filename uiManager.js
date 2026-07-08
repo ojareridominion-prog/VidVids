@@ -186,7 +186,7 @@ export async function shareBot() {
     const shareData = {
         title: 'VidVids',
         text: '‎SnapShot 📸 - Your vibe, your view. Swipe, zoom, vibe 🎉. Effortless image magic ✨. 😊‎',
-        url: 'https://t.me/IMAGIFHUB_bot'
+        url: 'https://t.me/vidvids_bot'
     };
     try {
         if (navigator.share) await navigator.share(shareData);
