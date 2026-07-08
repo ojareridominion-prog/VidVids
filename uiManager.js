@@ -74,7 +74,6 @@ function initMenuOverlay() {
 
 // Apply custom theme (background + bar) based on a base color
 function applyCustomTheme(baseColor) {
-    // Remove any preset theme classes
     document.body.classList.remove(
         'theme-white', 'theme-blood', 'theme-cyan', 'theme-sky',
         'theme-orange', 'theme-green', 'theme-violet'
@@ -110,15 +109,12 @@ function loadCustomThemeSettings() {
 }
 
 // Legacy applyTheme for compatibility with script.js
-// Converts old theme names to custom background colors
 export function applyTheme(themeId) {
-    // Remove old theme classes
     document.body.classList.remove(
         'theme-white', 'theme-blood', 'theme-cyan', 'theme-sky',
         'theme-orange', 'theme-green', 'theme-violet'
     );
     
-    // Map old theme IDs to background colors
     const themeMap = {
         'theme-white': '#ffffff',
         'theme-blood': '#4a0e0e',
@@ -133,7 +129,6 @@ export function applyTheme(themeId) {
     const bgColor = themeMap[themeId] || '#000000';
     applyCustomTheme(bgColor);
     
-    // Also save the theme ID for potential future use
     if (themeId !== 'theme-black') {
         localStorage.setItem('imagifhub-theme', themeId);
     } else {
@@ -204,7 +199,6 @@ export async function shareBot() {
 
 // MODIFIED: refresh TON prices before opening premium modal
 export function openPremium() {
-    // Update TON prices dynamically (if function exists)
     if (window.updateTonPrices) {
         window.updateTonPrices().catch(console.warn);
     }
@@ -264,27 +258,34 @@ export function copyUserId() {
     }
 }
 
-export function toggleDarkText() {
-    state.darkTextEnabled = !state.darkTextEnabled;
-    localStorage.setItem('imagifhub-darktext', state.darkTextEnabled);
-    applyDarkText();
-    updateDarkTextIndicator();
+// ==================== CONTROL POSITION TOGGLE (replaces Dark Text) ====================
+export function toggleControlPosition() {
+    const current = localStorage.getItem('vidvids_control_position') || 'right';
+    const next = current === 'right' ? 'left' : 'right';
+    localStorage.setItem('vidvids_control_position', next);
+
+    // Update all existing video-controls elements
+    document.querySelectorAll('.video-controls').forEach(el => {
+        el.classList.remove('controls-right', 'controls-left');
+        el.classList.add(next === 'left' ? 'controls-left' : 'controls-right');
+    });
+
+    updateControlPositionIndicator(next);
 }
 
-function applyDarkText() {
-    document.body.classList.toggle('dark-text', state.darkTextEnabled);
-}
-
-function updateDarkTextIndicator() {
-    const indicator = document.getElementById('darkTextIndicator');
-    if (indicator) indicator.innerText = state.darkTextEnabled ? 'ON' : 'OFF';
+function updateControlPositionIndicator(position) {
+    const indicator = document.getElementById('controlPosIndicator');
+    if (indicator) {
+        indicator.innerText = position === 'left' ? 'LEFT' : 'RIGHT';
+    }
 }
 
 export function initUI() {
-    applyDarkText();
-    updateDarkTextIndicator();
+    // Load and apply control position
+    const pos = localStorage.getItem('vidvids_control_position') || 'right';
+    updateControlPositionIndicator(pos);
+
     loadCustomThemeSettings();
     initCustomThemeEngine();
     initMenuOverlay();
-    // initSearchPanel() removed – no search functionality
     }
