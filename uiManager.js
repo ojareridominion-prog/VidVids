@@ -185,7 +185,7 @@ function initCustomThemeEngine() {
 export async function shareBot() {
     const shareData = {
         title: 'VidVids',
-        text: '‎SnapShot 📸 - Your vibe, your view. Swipe, zoom, vibe 🎉. Effortless image magic ✨. 😊‎',
+        text: '‎Your pocket player for YouTube Shorts. No clutter, no noise — just endless vertical videos.',
         url: 'https://t.me/vidvids_bot'
     };
     try {
