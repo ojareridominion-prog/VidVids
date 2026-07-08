@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { fetchNativeAds, setupAdButtonListeners } from './adsManager.js';
 import { verifyPremiumStatus, updateWatchAdCard, startTempPremiumCountdown, showRewardedAdWrapper as premiumRewardedWrapper } from './premiumManager.js';
 import { loadFeed, resetAndLoadFeed } from './feedManager.js';
-import { toggleMenu, applyTheme, shareBot, openPremium, closePremium, openCopyright, closeCopyright, openPrivacy, closePrivacy, copyUserId, toggleDarkText, initUI } from './uiManager.js';
+import { toggleMenu, applyTheme, shareBot, openPremium, closePremium, openCopyright, closeCopyright, openPrivacy, closePrivacy, copyUserId, toggleControlPosition, initUI } from './uiManager.js';
 import { initGiftSystem, refreshRecentGiftCard, showGiftDrawer } from './giftManager.js';
 import { initWalletUI, sendTonPremiumPayment } from './tonPayment.js';
 import { initOverlayMonitor } from './overlayMonitor.js';
@@ -35,7 +35,7 @@ window.openPremium = openPremium;
 window.closePremium = closePremium;
 window.goPremium = goPremium;
 window.verifyPremiumStatus = verifyPremiumStatus;
-window.toggleDarkText = toggleDarkText;
+window.toggleControlPosition = toggleControlPosition;
 window.openCopyright = openCopyright;
 window.closeCopyright = closeCopyright;
 window.copyUserId = copyUserId;
@@ -146,7 +146,6 @@ function initWatchAdButton() {
             watchAdBtn.disabled = true;
             watchAdBtn.innerText = "⏳ Loading ad...";
             try {
-                // Pause videos before showing rewarded ad
                 window.pauseAllVideos();
                 await premiumRewardedWrapper();
             } catch (err) { console.error(err); }
