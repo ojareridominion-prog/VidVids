@@ -58,7 +58,7 @@ async def send_banner_ad(chat_id: int, user_id: int):
         return
 
     # 4. Fetch a random ad
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://imagifhub.onrender.com")
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://vidvids.onrender.com")
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(f"{base_url}/api/random-ad") as resp:
