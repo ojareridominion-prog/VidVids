@@ -124,7 +124,7 @@ function generateVideoSlide(img) {
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
-                style="width:100%; height:100%; border:none; pointer-events:none;">
+                style="width:100%; height:100%; border:none;">
             </iframe>
             <div class="video-controls ${controlsClass}">
                 <button class="gift-icon-btn video-gift-btn" aria-label="Send Gift">🎁</button>
