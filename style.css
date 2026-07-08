@@ -607,45 +607,31 @@ body.dark-text .description-text {
 
 /* Floating Gift Button (kept original) */
 .gift-icon-btn {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: rgba(0, 0, 0, 0.6);
-    border: none;
-    font-size: 44px;
+/* Floating Gift Button (now used inside video controls) */
+.gift-icon-btn {
+    /* REMOVE position: absolute, top, right */
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    font-size: 32px;
     cursor: pointer;
-    z-index: 20;
     border-radius: 50%;
-    width: 64px;
-    height: 64px;
+    width: 52px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    text-shadow: 0 0 4px rgba(0,0,0,0.5);
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
     transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-    animation: pulseGlow 1.5s infinite ease-in-out;
+    flex-shrink: 0; /* prevents squishing in flex */
+    /* REMOVE animation: pulseGlow ... */
 }
-@keyframes pulseGlow {
-    0% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
-        background: rgba(0, 0, 0, 0.6);
-    }
-    50% {
-        transform: scale(1.08);
-        box-shadow: 0 0 12px 6px rgba(255, 215, 0, 0.7);
-        background: rgba(0, 0, 0, 0.8);
-    }
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
-        background: rgba(0, 0, 0, 0.6);
-    }
+.gift-icon-btn:hover {
+    background: rgba(255, 215, 0, 0.3);
+    transform: scale(1.1);
 }
 .gift-icon-btn:active {
-    transform: scale(0.94);
-    animation: none;
+    transform: scale(0.9);
 }
 
 /* Prevent interactions with inactive slides – preserves transition */
