@@ -927,6 +927,7 @@ body.dark-text .description-text {
 }
 
 /* ===== VIDEO CONTROLS (overlay buttons) ===== */
+/* ===== VIDEO CONTROLS (overlay buttons) ===== */
 .video-controls {
     position: absolute;
     top: 50%;
@@ -934,12 +935,11 @@ body.dark-text .description-text {
     z-index: 30;
     display: flex;
     flex-direction: column;
-    gap: 20px;                     /* increased from 12px to avoid overlap */
-    background: rgba(0, 0, 0, 0.5);
-    padding: 14px 10px;
-    border-radius: 30px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    gap: 24px;                     /* increased from 20px for a bit more breathing room */
+    background: transparent;        /* completely transparent (removed dark glass) */
+    padding: 4px 0;                /* minimal padding since background is gone */
+    border-radius: 0;              /* no rounded corners needed without background */
+    /* backdrop-filter and -webkit-backdrop-filter removed */
 }
 
 .video-controls.controls-right {
