@@ -944,6 +944,7 @@ body.dark-text .description-text {
     transform: scale(0.95);
 }
 /* ===== VIDEO CONTROLS (overlay buttons) ===== */
+/* ===== VIDEO CONTROLS (overlay buttons) ===== */
 .video-controls {
     position: absolute;
     top: 50%;
@@ -951,13 +952,14 @@ body.dark-text .description-text {
     z-index: 30;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 18px;                    /* increased from 12px */
     background: rgba(0, 0, 0, 0.5);
-    padding: 10px 8px;
+    padding: 14px 10px;           /* slightly more vertical padding */
     border-radius: 30px;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
+
 .video-controls.controls-right {
     right: 12px;
 }
@@ -965,40 +967,50 @@ body.dark-text .description-text {
     left: 12px;
 }
 
-‎.video-controls button {
-‎    background: transparent;
-‎    border: none;
-‎    color: white;
-‎    font-size: 28px;
-‎    cursor: pointer;
-‎    padding: 0;
-‎    line-height: 1;
-‎    width: 44px;
-‎    height: 44px;
-‎    display: flex;
-‎    align-items: center;
-‎    justify-content: center;
-‎    border-radius: 50%;
-‎    flex-shrink: 0;          /* prevent shrinking */
-‎    text-shadow: 0 0 8px rgba(0,0,0,0.8);
-‎}
+/* base button style */
+.video-controls button {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;               /* prevent shrinking */
+    text-shadow: 0 0 8px rgba(0,0,0,0.8);
+    transition: transform 0.15s, background 0.15s;
+}
 .video-controls button:hover {
-    transform: scale(1.15);
+    transform: scale(1.1);
     background: rgba(255,255,255,0.15);
 }
 .video-controls button:active {
     transform: scale(0.9);
 }
 
-/* Gift button inside video controls – smaller than the floating one */
+/* Gift button inside controls – bigger and slightly highlighted */
 .video-controls .video-gift-btn {
-    font-size: 32px;
-    animation: none; /* override the pulseGlow animation */
-}
-/* Remove the default gift icon animation on this smaller version */
-.video-controls .video-gift-btn {
-    animation: none !important;
+    font-size: 38px;              /* bigger than the up/down buttons */
+    width: 56px;
+    height: 56px;
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    animation: none;              /* remove the floating pulse glow */
 }
 .video-controls .video-gift-btn:hover {
-    animation: pulseGlow 1.5s infinite ease-in-out;
+    background: rgba(255, 215, 0, 0.3);
+}
+
+/* up/down buttons can keep the base size */
+.video-controls .video-up-btn,
+.video-controls .video-down-btn {
+    font-size: 28px;
+    width: 44px;
+    height: 44px;
 }
