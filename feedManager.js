@@ -24,7 +24,6 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
-    // autoplay=0, loop=1, controls=0, modestbranding=1, playsinline=1, rel=0, showinfo=0, enablejsapi=1
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
@@ -101,6 +100,7 @@ function escapeHtml(str) {
     });
 }
 
+// === UPDATED: generateVideoSlide with controls ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -112,6 +112,11 @@ function generateVideoSlide(img) {
             </div>
         `;
     }
+
+    // Get current control position from localStorage (default 'right')
+    const pos = localStorage.getItem('vidvids_control_position') || 'right';
+    const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
+
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
@@ -119,8 +124,13 @@ function generateVideoSlide(img) {
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
-                style="width:100%; height:100%; border:none;">
+                style="width:100%; height:100%; border:none; pointer-events:none;">
             </iframe>
+            <div class="video-controls ${controlsClass}">
+                <button class="gift-icon-btn video-gift-btn" aria-label="Send Gift">🎁</button>
+                <button class="video-up-btn">⬆️</button>
+                <button class="video-down-btn">⬇️</button>
+            </div>
         </div>
     `;
 }
@@ -140,7 +150,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// ---------- New: manage video playback (only active slide gets autoplay=1) ----------
+// Manage video playback (unchanged)
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -150,7 +160,6 @@ function manageVideoPlayback(swiperInstance) {
         const iframe = slide.querySelector('iframe');
         if (!iframe) return;
         let src = iframe.src;
-        // Toggle autoplay based on active status
         const shouldPlay = (idx === activeIndex);
         if (shouldPlay) {
             if (!src.includes('autoplay=1')) {
@@ -193,7 +202,6 @@ async function appendMoreImages(newImages) {
     state.allImages.push(...newImages);
     newImages.forEach(img => state.sessionSeenUrls.add(img.url));
 
-    // After appending, ensure active slide video is playing
     setTimeout(() => manageVideoPlayback(swiper), 100);
     return true;
 }
@@ -202,13 +210,11 @@ function renderSlides(slides) {
     const feed = document.getElementById('feed');
     if (!feed) return;
 
-    // 1. Destroy existing Swiper instance if any
     if (state.activeSwiper) {
         state.activeSwiper.destroy(true, true);
         state.activeSwiper = null;
     }
 
-    // 2. Replace content with new slides
     feed.innerHTML = slides.map(slide => {
         if (slide.type === 'image') {
             return generateVideoSlide(slide.item);
@@ -217,14 +223,14 @@ function renderSlides(slides) {
         }
     }).join('');
 
-    // 3. Initialize new Swiper
+    // Initialize Swiper
     state.activeSwiper = new Swiper('#swiper', {
         direction: 'vertical',
         mousewheel: true,
         effect: 'slide',
         speed: 300,
-        observer: true,          // Watch for DOM changes
-        observeParents: true,    // Watch parent container changes
+        observer: true,
+        observeParents: true,
         on: {
             reachEnd: async () => {
                 if (state.activeSearchQuery) return;
@@ -232,26 +238,21 @@ function renderSlides(slides) {
                 await loadMoreImages(true);
             },
             slideChange: function () {
-                // Pause all via the global function (legacy)
                 pauseAllVideos();
-                // Manage autoplay state per slide
                 manageVideoPlayback(this);
 
-                // Interstitial ad logic (unchanged)
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
                     if (state.imagesShownSinceLastAd >= 15) {
                         state.imagesShownSinceLastAd = 0;
                         this.allowTouchMove = false;
-                        pauseAllVideos(); // extra safety
+                        pauseAllVideos();
                         showMonetagInterstitial().finally(() => { this.allowTouchMove = true; });
                     }
                 }
             },
             init: function () {
-                // Ensure first slide plays
                 manageVideoPlayback(this);
-                // Also play via postMessage as a fallback
                 const activeSlide = this.slides[this.activeIndex];
                 if (activeSlide) {
                     const iframe = activeSlide.querySelector('iframe');
@@ -263,7 +264,23 @@ function renderSlides(slides) {
         }
     });
 
-    // Force update after a tiny delay to ensure layout
+    // Attach event listeners for up/down buttons (delegation on feed)
+    feed.addEventListener('click', function(e) {
+        const target = e.target.closest('.video-up-btn, .video-down-btn');
+        if (!target) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const swiper = state.activeSwiper;
+        if (!swiper) return;
+
+        if (target.classList.contains('video-up-btn')) {
+            swiper.slidePrev();
+        } else if (target.classList.contains('video-down-btn')) {
+            swiper.slideNext();
+        }
+    });
+
     setTimeout(() => {
         if (state.activeSwiper) state.activeSwiper.update();
     }, 100);
@@ -331,4 +348,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-}
+        }
