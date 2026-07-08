@@ -980,18 +980,6 @@ body.dark-text .description-text {
     transform: scale(0.9);
 }
 
-/* Gift button inside controls – bigger and slightly highlighted */
-.video-controls .video-gift-btn {
-    font-size: 38px;              /* bigger than the up/down buttons */
-    width: 56px;
-    height: 56px;
-    background: rgba(255, 215, 0, 0.15);
-    border: 1px solid rgba(255, 215, 0, 0.3);
-    animation: none;              /* remove the floating pulse glow */
-}
-.video-controls .video-gift-btn:hover {
-    background: rgba(255, 215, 0, 0.3);
-}
 
 /* up/down buttons can keep the base size */
 .video-controls .video-up-btn,
