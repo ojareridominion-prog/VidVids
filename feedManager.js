@@ -86,7 +86,11 @@ function initYouTubeMessageListener() {
 
             // ---- onStateChange ----
             if (data.event === 'onStateChange') {
-                const stateCode = data.info?.playerState;
+                // Support both possible data structures
+                let stateCode = data.info?.playerState;
+                if (stateCode === undefined) stateCode = data.playerState;
+                if (stateCode === undefined) return; // not a state change we can interpret
+
                 // 0 = ENDED → loop seamlessly
                 if (stateCode === 0) {
                     const iframes = document.querySelectorAll('iframe');
@@ -96,8 +100,15 @@ function initYouTubeMessageListener() {
                             // Only loop if this is the active slide (avoid background noise)
                             if (slide && slide.classList.contains('swiper-slide-active')) {
                                 // Seek to start and play – uses cached buffer, no reload
-                                seekToIframe(iframe, 0);
-                                controlIframePlayback(iframe, true);
+                                // We do it immediately, but if the player hasn't finished unloading,
+                                // we retry after a short delay to ensure the command is accepted.
+                                const doLoop = () => {
+                                    seekToIframe(iframe, 0);
+                                    controlIframePlayback(iframe, true);
+                                };
+                                doLoop();
+                                // Safety net: if the first attempt doesn't work, try again after 200ms
+                                setTimeout(doLoop, 200);
                             }
                             break;
                         }
@@ -485,4 +496,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-                                                                          }
+            }
