@@ -9,6 +9,7 @@ const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
 // Helper: convert YouTube URL to embedded player URL with autoplay initially OFF
+// Removed loop=1 and playlist= to avoid reloading on loop
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
     const patterns = [
@@ -24,7 +25,7 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
-    return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
 // Global pause function (defined in script.js) – use it
@@ -47,7 +48,16 @@ function controlIframePlayback(iframe, shouldPlay) {
     }
 }
 
-// ---------- YouTube message listener for onReady ----------
+// Helper: seek to a specific time in the video
+function seekToIframe(iframe, seconds) {
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true] }),
+        '*'
+    );
+}
+
+// ---------- YouTube message listener for onReady and onStateChange ----------
 let youtubeListenerInitialized = false;
 
 function initYouTubeMessageListener() {
@@ -58,6 +68,8 @@ function initYouTubeMessageListener() {
         if (event.origin !== 'https://www.youtube.com') return;
         try {
             const data = JSON.parse(event.data);
+
+            // ---- onReady ----
             if (data.event === 'onReady') {
                 const iframes = document.querySelectorAll('iframe');
                 for (const iframe of iframes) {
@@ -68,6 +80,27 @@ function initYouTubeMessageListener() {
                             iframe._playQueued = false;
                         }
                         break;
+                    }
+                }
+            }
+
+            // ---- onStateChange ----
+            if (data.event === 'onStateChange') {
+                const stateCode = data.info?.playerState;
+                // 0 = ENDED → loop seamlessly
+                if (stateCode === 0) {
+                    const iframes = document.querySelectorAll('iframe');
+                    for (const iframe of iframes) {
+                        if (iframe.contentWindow === event.source) {
+                            const slide = iframe.closest('.swiper-slide');
+                            // Only loop if this is the active slide (avoid background noise)
+                            if (slide && slide.classList.contains('swiper-slide-active')) {
+                                // Seek to start and play – uses cached buffer, no reload
+                                seekToIframe(iframe, 0);
+                                controlIframePlayback(iframe, true);
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -452,4 +485,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-    }
+                                                                          }
