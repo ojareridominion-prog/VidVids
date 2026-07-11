@@ -102,9 +102,6 @@ function generateVideoSlide(img) {
             <div class="video-placeholder" style="width:100%; height:100%; background:#000; display:flex; align-items:center; justify-content:center; position:relative;">
                 <img src="${thumbnailUrl}" alt="Video thumbnail" loading="lazy"
                      style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">
-                <div style="position:relative; z-index:2; background:rgba(0,0,0,0.4); border-radius:50%; padding:12px; pointer-events:none;">
-                    <span style="font-size:48px; color:white;">▶</span>
-                </div>
                 <!-- The iframe will be inserted here when slide becomes active -->
                 <div class="video-iframe-container" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
             </div>
