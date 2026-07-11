@@ -8,7 +8,7 @@ const PAGE_SIZE = 30;
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
-// Helper: convert YouTube URL to embedded player URL with autoplay initially OFF
+// Helper: convert YouTube URL to embedded player URL
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
     const patterns = [
@@ -24,12 +24,10 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
-    // We'll use autoplay=1 when we actually load the iframe, so keep it as 0 here
-    // and add autoplay=1 when setting src.
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
-// Global pause function (defined in script.js) – use it
+// Global pause function (defined in script.js)
 function pauseAllVideos() {
     if (window.pauseAllVideos && typeof window.pauseAllVideos === 'function') {
         window.pauseAllVideos();
@@ -102,7 +100,7 @@ function escapeHtml(str) {
     });
 }
 
-// === UPDATED: generateVideoSlide with lazy-load iframe ===
+// === generateVideoSlide with lazy-load iframe ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -115,17 +113,14 @@ function generateVideoSlide(img) {
         `;
     }
 
-    // Get current control position from localStorage (default 'right')
     const pos = localStorage.getItem('vidvids_control_position') || 'right';
     const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
 
-    // We store the URL with autoplay=0 in data-src, but when we load we'll add autoplay=1
-    const finalUrl = embedUrl; // already has autoplay=0
-
+    // Store the URL (with autoplay=0) in data-src; src will be set later with autoplay=1
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
-                data-src="${finalUrl}" 
+                data-src="${embedUrl}" 
                 src="" 
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
@@ -156,7 +151,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// === UPDATED: manageVideoPlayback – lazy load, no src rewriting ===
+// === manageVideoPlayback – lazy load, no src rewriting ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -168,23 +163,26 @@ function manageVideoPlayback(swiperInstance) {
 
         const isActive = (idx === activeIndex);
 
-        // 1. Lazy-load: if active and src is empty, load from data-src with autoplay=1
+        // 1. Lazy-load: if active and src is empty, load from data-src
         if (isActive && !iframe.src) {
             const dataSrc = iframe.dataset.src;
             if (dataSrc) {
-                // Add autoplay=1 to the URL so it starts playing immediately
+                // Add autoplay=1 to start playing immediately
                 const srcWithAutoplay = dataSrc.replace(/autoplay=\d/, 'autoplay=1');
                 iframe.src = srcWithAutoplay;
-                // No need to send play command; autoplay handles it.
-                // But we set onload as a fallback (if autoplay doesn't work)
-                iframe.onload = function() {
-                    playIframeVideo(iframe); // just in case
-                    iframe.onload = null;
+
+                // Ensure it starts playing – fallback if autoplay is blocked
+                const playFallback = () => {
+                    playIframeVideo(iframe);
                 };
+                // Use onload as primary trigger
+                iframe.onload = playFallback;
+                // Also try after 800ms in case onload doesn't fire
+                setTimeout(playFallback, 800);
             }
         }
 
-        // 2. For already-loaded iframes, control play/pause via postMessage (no src changes)
+        // 2. For already-loaded iframes, control play/pause via postMessage
         if (iframe.src) {
             if (isActive) {
                 playIframeVideo(iframe); // ensure it's playing
@@ -277,13 +275,6 @@ function renderSlides(slides) {
             },
             init: function () {
                 manageVideoPlayback(this);
-                const activeSlide = this.slides[this.activeIndex];
-                if (activeSlide) {
-                    const iframe = activeSlide.querySelector('iframe');
-                    if (iframe) {
-                        // manageVideoPlayback will handle loading if needed
-                    }
-                }
             }
         }
     });
@@ -372,4 +363,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-        }
+}
