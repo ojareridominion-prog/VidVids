@@ -44,36 +44,26 @@ function controlIframePlayback(iframe, shouldPlay) {
     );
 }
 
-// Lazy‑load an iframe: set src from data-src and play after load
+// Lazy‑load an iframe: set src from data-src, then play after a short delay
 function lazyLoadIframe(iframe, playAfterLoad = true) {
     if (!iframe) return;
     const dataSrc = iframe.dataset.src;
     if (!dataSrc) return;
-
-    // If src is already set (non‑empty), just play/pause if needed
-    if (iframe.src && iframe.src !== '') {
+    // Only set src if it hasn't been set already
+    if (iframe.src !== dataSrc) {
+        iframe.src = dataSrc;
+        // Once loaded, if playAfterLoad, send play command
+        if (playAfterLoad) {
+            // Use a small timeout to allow the player to initialize
+            setTimeout(() => {
+                controlIframePlayback(iframe, true);
+            }, 300);
+        }
+    } else {
+        // src already set; just play if needed
         if (playAfterLoad) {
             controlIframePlayback(iframe, true);
         }
-        return;
-    }
-
-    // First load: set src and wait for load event
-    iframe.src = dataSrc;
-    if (playAfterLoad) {
-        // Attach one‑time load listener
-        const onLoad = () => {
-            iframe.removeEventListener('load', onLoad);
-            controlIframePlayback(iframe, true);
-        };
-        iframe.addEventListener('load', onLoad);
-        // Fallback: if load never fires, try after 1 second
-        setTimeout(() => {
-            if (iframe.src === dataSrc) {
-                // If still loading, try to play anyway
-                controlIframePlayback(iframe, true);
-            }
-        }, 1000);
     }
 }
 
@@ -91,8 +81,13 @@ function manageVideoPlayback(swiperInstance) {
             // Active: load if needed and play
             lazyLoadIframe(iframe, true);
         } else {
-            // Inactive: just pause, keep src loaded
+            // Inactive: pause and unload to save data
             controlIframePlayback(iframe, false);
+            // Remove src to free network resources (will be reloaded from data-src when active)
+            // We store the original src in data-src (already there)
+            if (iframe.src) {
+                iframe.src = ''; // unload
+            }
         }
     });
 }
