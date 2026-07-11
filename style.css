@@ -27,7 +27,7 @@ body { margin:0; background:var(--bg); color:var(--text); font-family: 'Inter', 
 }
 .cat-bar::-webkit-scrollbar { display: none; }
 
-.cat-btn { padding:6px 15px; border-radius:20px; background:rgba(51,51,51,0.9); font-size:12px; white-space:nowrap; border:none; color:#fff; cursor:pointer; }
+.cat-btn { padding:6px 15px; border-radius:6px; background:rgba(51,51,51,0.9); font-size:12px; white-space:nowrap; border:none; color:#fff; cursor:pointer; }
 .cat-btn.active { background:var(--accent); font-weight: bold; }
 
 /* Menu Overlay (solid dark) */
