@@ -34,10 +34,62 @@ function pauseAllVideos() {
     }
 }
 
-function playIframeVideo(iframe) {
-    if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+// Send play/pause commands via postMessage (no src rewriting)
+function controlIframePlayback(iframe, shouldPlay) {
+    if (!iframe || !iframe.contentWindow) return;
+    const command = shouldPlay ? 'playVideo' : 'pauseVideo';
+    iframe.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: command, args: '' }),
+        '*'
+    );
+}
+
+// Lazy‑load an iframe: set src from data-src, then play after a short delay
+function lazyLoadIframe(iframe, playAfterLoad = true) {
+    if (!iframe) return;
+    const dataSrc = iframe.dataset.src;
+    if (!dataSrc) return;
+    // Only set src if it hasn't been set already
+    if (iframe.src !== dataSrc) {
+        iframe.src = dataSrc;
+        // Once loaded, if playAfterLoad, send play command
+        if (playAfterLoad) {
+            // Use a small timeout to allow the player to initialize
+            setTimeout(() => {
+                controlIframePlayback(iframe, true);
+            }, 300);
+        }
+    } else {
+        // src already set; just play if needed
+        if (playAfterLoad) {
+            controlIframePlayback(iframe, true);
+        }
     }
+}
+
+// Manage video playback for the active slide and clean up inactive ones
+function manageVideoPlayback(swiperInstance) {
+    if (!swiperInstance) return;
+    const slides = swiperInstance.slides;
+    const activeIndex = swiperInstance.activeIndex;
+
+    slides.forEach((slide, idx) => {
+        const iframe = slide.querySelector('iframe');
+        if (!iframe) return;
+        const isActive = (idx === activeIndex);
+        if (isActive) {
+            // Active: load if needed and play
+            lazyLoadIframe(iframe, true);
+        } else {
+            // Inactive: pause and unload to save data
+            controlIframePlayback(iframe, false);
+            // Remove src to free network resources (will be reloaded from data-src when active)
+            // We store the original src in data-src (already there)
+            if (iframe.src) {
+                iframe.src = ''; // unload
+            }
+        }
+    });
 }
 
 async function fetchRandomImages(category = state.currentCategory, search = "", retryCount = 0) {
@@ -100,7 +152,7 @@ function escapeHtml(str) {
     });
 }
 
-// === UPDATED: generateVideoSlide with controls ===
+// === UPDATED: generateVideoSlide with data-src and lazy attributes ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -120,7 +172,10 @@ function generateVideoSlide(img) {
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
-                src="${embedUrl}" 
+                data-src="${embedUrl}" 
+                src="" 
+                loading="lazy" 
+                preload="none"
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
@@ -148,62 +203,6 @@ function generateAdSlide(ad, adIndex) {
             <button class="remove-ads-btn">Remove Ads</button>
         </div>
     `;
-}
-
-// Manage video playback (unchanged)
-function manageVideoPlayback(swiperInstance) {
-    if (!swiperInstance) return;
-    const slides = swiperInstance.slides;
-    const activeIndex = swiperInstance.activeIndex;
-
-    slides.forEach((slide, idx) => {
-        const iframe = slide.querySelector('iframe');
-        if (!iframe) return;
-        let src = iframe.src;
-        const shouldPlay = (idx === activeIndex);
-        if (shouldPlay) {
-            if (!src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=1');
-            }
-        } else {
-            if (src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=0');
-            }
-        }
-    });
-}
-
-async function appendMoreImages(newImages) {
-    if (!state.activeSwiper || newImages.length === 0) return false;
-
-    const swiper = state.activeSwiper;
-    const oldImageCount = state.allImages.length;
-    const htmlSlides = [];
-    let localAdIndex = state.currentAdIndex;
-
-    for (let i = 0; i < newImages.length; i++) {
-        const img = newImages[i];
-        htmlSlides.push(generateVideoSlide(img));
-
-        const position = oldImageCount + i + 1;
-        if (!state.isPremiumUser && position % AD_FREQUENCY === 0) {
-            const ad = state.nativeAds[localAdIndex % state.nativeAds.length];
-            htmlSlides.push(generateAdSlide(ad, localAdIndex % state.nativeAds.length));
-            localAdIndex++;
-        }
-    }
-
-    if (htmlSlides.length === 0) return false;
-
-    swiper.appendSlide(htmlSlides);
-    swiper.update();
-
-    state.currentAdIndex = localAdIndex;
-    state.allImages.push(...newImages);
-    newImages.forEach(img => state.sessionSeenUrls.add(img.url));
-
-    setTimeout(() => manageVideoPlayback(swiper), 100);
-    return true;
 }
 
 function renderSlides(slides) {
@@ -252,14 +251,8 @@ function renderSlides(slides) {
                 }
             },
             init: function () {
+                // Load and play the first active slide
                 manageVideoPlayback(this);
-                const activeSlide = this.slides[this.activeIndex];
-                if (activeSlide) {
-                    const iframe = activeSlide.querySelector('iframe');
-                    if (iframe) {
-                        setTimeout(() => playIframeVideo(iframe), 100);
-                    }
-                }
             }
         }
     });
@@ -348,4 +341,39 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
+}
+
+// Helper to append more images (kept as is)
+async function appendMoreImages(newImages) {
+    if (!state.activeSwiper || newImages.length === 0) return false;
+
+    const swiper = state.activeSwiper;
+    const oldImageCount = state.allImages.length;
+    const htmlSlides = [];
+    let localAdIndex = state.currentAdIndex;
+
+    for (let i = 0; i < newImages.length; i++) {
+        const img = newImages[i];
+        htmlSlides.push(generateVideoSlide(img));
+
+        const position = oldImageCount + i + 1;
+        if (!state.isPremiumUser && position % AD_FREQUENCY === 0) {
+            const ad = state.nativeAds[localAdIndex % state.nativeAds.length];
+            htmlSlides.push(generateAdSlide(ad, localAdIndex % state.nativeAds.length));
+            localAdIndex++;
+        }
+    }
+
+    if (htmlSlides.length === 0) return false;
+
+    swiper.appendSlide(htmlSlides);
+    swiper.update();
+
+    state.currentAdIndex = localAdIndex;
+    state.allImages.push(...newImages);
+    newImages.forEach(img => state.sessionSeenUrls.add(img.url));
+
+    // Manage playback for the newly added slides (the active slide may not be one of them)
+    // We'll rely on slideChange events to handle them when they become active.
+    return true;
 }
