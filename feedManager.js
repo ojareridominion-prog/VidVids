@@ -8,7 +8,7 @@ const PAGE_SIZE = 30;
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
-// Helper: convert YouTube URL to embedded player URL
+// Helper: convert YouTube URL to embedded player URL with autoplay initially OFF
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
     const patterns = [
@@ -27,7 +27,7 @@ function getYouTubeEmbedUrl(url) {
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
-// Global pause function (defined in script.js)
+// Global pause function (defined in script.js) – use it
 function pauseAllVideos() {
     if (window.pauseAllVideos && typeof window.pauseAllVideos === 'function') {
         window.pauseAllVideos();
@@ -100,7 +100,7 @@ function escapeHtml(str) {
     });
 }
 
-// === generateVideoSlide with lazy-load iframe ===
+// === UPDATED: generateVideoSlide with controls ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -113,15 +113,14 @@ function generateVideoSlide(img) {
         `;
     }
 
+    // Get current control position from localStorage (default 'right')
     const pos = localStorage.getItem('vidvids_control_position') || 'right';
     const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
 
-    // Store the URL (with autoplay=0) in data-src; src will be set later with autoplay=1
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
-                data-src="${embedUrl}" 
-                src="" 
+                src="${embedUrl}" 
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
@@ -151,7 +150,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// === manageVideoPlayback – lazy load with src rewrite autoplay=1 (no postMessage for initial play) ===
+// Manage video playback (unchanged)
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -160,31 +159,15 @@ function manageVideoPlayback(swiperInstance) {
     slides.forEach((slide, idx) => {
         const iframe = slide.querySelector('iframe');
         if (!iframe) return;
-
-        const isActive = (idx === activeIndex);
-
-        // 1. Lazy-load: if active and src is empty, load from data-src with autoplay=1
-        if (isActive && !iframe.src) {
-            const dataSrc = iframe.dataset.src;
-            if (dataSrc) {
-                // Replace autoplay=0 with autoplay=1 to force immediate playback
-                const srcWithAutoplay = dataSrc.replace(/autoplay=\d/, 'autoplay=1');
-                iframe.src = srcWithAutoplay;
-
-                // DO NOT send postMessage here – autoplay=1 handles it.
-                // No onload or setTimeout needed – autoplay is reliable with user gesture (swipe)
+        let src = iframe.src;
+        const shouldPlay = (idx === activeIndex);
+        if (shouldPlay) {
+            if (!src.includes('autoplay=1')) {
+                iframe.src = src.replace(/autoplay=\d/, 'autoplay=1');
             }
-        }
-
-        // 2. For already-loaded iframes, control play/pause via postMessage (no src changes)
-        if (iframe.src) {
-            if (isActive) {
-                // If it's already loaded but paused, ensure it plays (redundant but safe)
-                playIframeVideo(iframe);
-            } else {
-                if (iframe.contentWindow) {
-                    iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-                }
+        } else {
+            if (src.includes('autoplay=1')) {
+                iframe.src = src.replace(/autoplay=\d/, 'autoplay=0');
             }
         }
     });
@@ -270,29 +253,33 @@ function renderSlides(slides) {
             },
             init: function () {
                 manageVideoPlayback(this);
+                const activeSlide = this.slides[this.activeIndex];
+                if (activeSlide) {
+                    const iframe = activeSlide.querySelector('iframe');
+                    if (iframe) {
+                        setTimeout(() => playIframeVideo(iframe), 100);
+                    }
+                }
             }
         }
     });
 
-    // Attach event listeners for up/down buttons (delegation on feed) – only once
-    if (!feed._listenerAttached) {
-        feed.addEventListener('click', function(e) {
-            const target = e.target.closest('.video-up-btn, .video-down-btn');
-            if (!target) return;
-            e.preventDefault();
-            e.stopPropagation();
+    // Attach event listeners for up/down buttons (delegation on feed)
+    feed.addEventListener('click', function(e) {
+        const target = e.target.closest('.video-up-btn, .video-down-btn');
+        if (!target) return;
+        e.preventDefault();
+        e.stopPropagation();
 
-            const swiper = state.activeSwiper;
-            if (!swiper) return;
+        const swiper = state.activeSwiper;
+        if (!swiper) return;
 
-            if (target.classList.contains('video-up-btn')) {
-                swiper.slidePrev();
-            } else if (target.classList.contains('video-down-btn')) {
-                swiper.slideNext();
-            }
-        });
-        feed._listenerAttached = true;
-    }
+        if (target.classList.contains('video-up-btn')) {
+            swiper.slidePrev();
+        } else if (target.classList.contains('video-down-btn')) {
+            swiper.slideNext();
+        }
+    });
 
     setTimeout(() => {
         if (state.activeSwiper) state.activeSwiper.update();
