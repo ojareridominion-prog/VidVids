@@ -24,6 +24,8 @@ function getYouTubeEmbedUrl(url) {
         }
     }
     if (!videoId) return null;
+    // We'll use autoplay=1 when we actually load the iframe, so keep it as 0 here
+    // and add autoplay=1 when setting src.
     return `https://www.youtube.com/embed/${videoId}?autoplay=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1`;
 }
 
@@ -100,7 +102,7 @@ function escapeHtml(str) {
     });
 }
 
-// === UPDATED: generateVideoSlide with controls ===
+// === UPDATED: generateVideoSlide with lazy-load iframe ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -117,10 +119,14 @@ function generateVideoSlide(img) {
     const pos = localStorage.getItem('vidvids_control_position') || 'right';
     const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
 
+    // We store the URL with autoplay=0 in data-src, but when we load we'll add autoplay=1
+    const finalUrl = embedUrl; // already has autoplay=0
+
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
-                src="${embedUrl}" 
+                data-src="${finalUrl}" 
+                src="" 
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
@@ -150,7 +156,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// Manage video playback (unchanged)
+// === UPDATED: manageVideoPlayback – lazy load, no src rewriting ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -159,15 +165,33 @@ function manageVideoPlayback(swiperInstance) {
     slides.forEach((slide, idx) => {
         const iframe = slide.querySelector('iframe');
         if (!iframe) return;
-        let src = iframe.src;
-        const shouldPlay = (idx === activeIndex);
-        if (shouldPlay) {
-            if (!src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=1');
+
+        const isActive = (idx === activeIndex);
+
+        // 1. Lazy-load: if active and src is empty, load from data-src with autoplay=1
+        if (isActive && !iframe.src) {
+            const dataSrc = iframe.dataset.src;
+            if (dataSrc) {
+                // Add autoplay=1 to the URL so it starts playing immediately
+                const srcWithAutoplay = dataSrc.replace(/autoplay=\d/, 'autoplay=1');
+                iframe.src = srcWithAutoplay;
+                // No need to send play command; autoplay handles it.
+                // But we set onload as a fallback (if autoplay doesn't work)
+                iframe.onload = function() {
+                    playIframeVideo(iframe); // just in case
+                    iframe.onload = null;
+                };
             }
-        } else {
-            if (src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=0');
+        }
+
+        // 2. For already-loaded iframes, control play/pause via postMessage (no src changes)
+        if (iframe.src) {
+            if (isActive) {
+                playIframeVideo(iframe); // ensure it's playing
+            } else {
+                if (iframe.contentWindow) {
+                    iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+                }
             }
         }
     });
@@ -257,7 +281,7 @@ function renderSlides(slides) {
                 if (activeSlide) {
                     const iframe = activeSlide.querySelector('iframe');
                     if (iframe) {
-                        setTimeout(() => playIframeVideo(iframe), 100);
+                        // manageVideoPlayback will handle loading if needed
                     }
                 }
             }
@@ -348,4 +372,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-                                 }
+        }
