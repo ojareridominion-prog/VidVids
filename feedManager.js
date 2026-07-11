@@ -58,8 +58,51 @@ function seekToIframe(iframe, seconds) {
     );
 }
 
+// Helper: get current time and duration from iframe (returns promise)
+function getVideoTime(iframe) {
+    return new Promise((resolve) => {
+        if (!iframe || !iframe.contentWindow) {
+            resolve(null);
+            return;
+        }
+        // We'll use a one-time message listener to capture the response
+        const handler = (event) => {
+            if (event.origin !== 'https://www.youtube.com') return;
+            try {
+                const data = JSON.parse(event.data);
+                if (data.event === 'infoDelivery' && data.info) {
+                    const currentTime = data.info.currentTime;
+                    const duration = data.info.duration;
+                    if (currentTime !== undefined && duration !== undefined) {
+                        window.removeEventListener('message', handler);
+                        resolve({ currentTime, duration });
+                    }
+                }
+            } catch (e) {}
+        };
+        window.addEventListener('message', handler);
+        // Send command to get current time and duration
+        iframe.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '' }),
+            '*'
+        );
+        iframe.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'getDuration', args: '' }),
+            '*'
+        );
+        // Timeout after 1 second
+        setTimeout(() => {
+            window.removeEventListener('message', handler);
+            resolve(null);
+        }, 1000);
+    });
+}
+
 // ---------- YouTube message listener for onReady, onStateChange, and infoDelivery ----------
 let youtubeListenerInitialized = false;
+let activeLoopPollInterval = null;
+let activePollingIframe = null;
+let isLooping = false; // prevent multiple loops
 
 function initYouTubeMessageListener() {
     if (youtubeListenerInitialized) return;
@@ -113,19 +156,63 @@ function handleVideoEnded(sourceWindow) {
             const slide = iframe.closest('.swiper-slide');
             // Only loop if this is the active slide (avoid background noise)
             if (slide && slide.classList.contains('swiper-slide-active')) {
-                // Seek to start and play – uses cached buffer, no reload
-                // Do it immediately, but also schedule a retry in case the player isn't ready
-                const doLoop = () => {
-                    seekToIframe(iframe, 0);
-                    controlIframePlayback(iframe, true);
-                };
-                doLoop();
-                // Safety net: if the first attempt doesn't take, try again after 200ms
-                setTimeout(doLoop, 200);
+                performLoop(iframe);
             }
             break;
         }
     }
+}
+
+// Perform the actual loop: seek to 0 and play
+function performLoop(iframe) {
+    if (isLooping) return;
+    isLooping = true;
+    // Seek to start and play – uses cached buffer, no reload
+    const doLoop = () => {
+        seekToIframe(iframe, 0);
+        controlIframePlayback(iframe, true);
+        // Reset the flag after a short delay
+        setTimeout(() => { isLooping = false; }, 500);
+    };
+    doLoop();
+    // Safety net: if the first attempt doesn't take, try again after 200ms
+    setTimeout(doLoop, 200);
+}
+
+// ============ Polling fallback: check time every second ============
+function startLoopPolling(iframe) {
+    stopLoopPolling(); // clear any existing interval
+    if (!iframe) return;
+    activePollingIframe = iframe;
+    activeLoopPollInterval = setInterval(async () => {
+        if (!activePollingIframe) {
+            stopLoopPolling();
+            return;
+        }
+        // Check if this iframe is still the active one
+        const slide = activePollingIframe.closest('.swiper-slide');
+        if (!slide || !slide.classList.contains('swiper-slide-active')) {
+            stopLoopPolling();
+            return;
+        }
+        // Get current time and duration
+        const info = await getVideoTime(activePollingIframe);
+        if (info && info.duration > 0) {
+            const { currentTime, duration } = info;
+            // If we're within 0.5 seconds of the end, loop
+            if (duration - currentTime < 0.5 && currentTime > 0) {
+                performLoop(activePollingIframe);
+            }
+        }
+    }, 1000);
+}
+
+function stopLoopPolling() {
+    if (activeLoopPollInterval) {
+        clearInterval(activeLoopPollInterval);
+        activeLoopPollInterval = null;
+    }
+    activePollingIframe = null;
 }
 
 // ============ Video placeholder and dynamic loading ============
@@ -243,14 +330,18 @@ function manageVideoPlayback(swiperInstance) {
                 // Iframe already exists, just play
                 controlIframePlayback(iframe, true);
             }
+            // Start polling for this iframe
+            startLoopPolling(iframe);
         } else {
             // Inactive: pause the video but DO NOT remove the iframe
             // This preserves the cached video and prevents reloading when scrolling back
             const iframe = container.querySelector('iframe');
             if (iframe) {
                 controlIframePlayback(iframe, false);
-                // Keep the thumbnail hidden because the iframe is still there
-                // but we can show a semi-transparent overlay if needed
+                // Stop polling if this was the active polling target
+                if (activePollingIframe === iframe) {
+                    stopLoopPolling();
+                }
             }
         }
     });
@@ -502,4 +593,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-        }
+}
