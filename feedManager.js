@@ -4,7 +4,7 @@ import { getSeenList, showLoadingSpinner, hideLoadingSpinner } from './utils.js'
 import { buildSlides, showMonetagInterstitial } from './adsManager.js';
 
 const API_URL = "https://vidvids.onrender.com";
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 12; // Reduced from 30 to save data
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
@@ -42,13 +42,12 @@ function controlIframePlayback(iframe, shouldPlay) {
         JSON.stringify({ event: 'command', func: command, args: '' }),
         '*'
     );
-    // If we just played, clear the queue flag (if any)
     if (shouldPlay && iframe._playQueued) {
         iframe._playQueued = false;
     }
 }
 
-// ---------- NEW: YouTube message listener for onReady ----------
+// ---------- YouTube message listener for onReady ----------
 let youtubeListenerInitialized = false;
 
 function initYouTubeMessageListener() {
@@ -56,19 +55,14 @@ function initYouTubeMessageListener() {
     youtubeListenerInitialized = true;
 
     window.addEventListener('message', function(event) {
-        // Only accept messages from YouTube
         if (event.origin !== 'https://www.youtube.com') return;
-
         try {
             const data = JSON.parse(event.data);
-            // Listen for the "onReady" event
             if (data.event === 'onReady') {
-                // Find which iframe sent this message
                 const iframes = document.querySelectorAll('iframe');
                 for (const iframe of iframes) {
                     if (iframe.contentWindow === event.source) {
                         const slide = iframe.closest('.swiper-slide');
-                        // Only play if this is the active slide and we have a pending play
                         if (slide && slide.classList.contains('swiper-slide-active') && iframe._playQueued) {
                             controlIframePlayback(iframe, true);
                             iframe._playQueued = false;
@@ -77,126 +71,64 @@ function initYouTubeMessageListener() {
                     }
                 }
             }
-        } catch (e) {
-            // Ignore malformed messages
-        }
+        } catch (e) { /* ignore malformed messages */ }
     });
 }
 
-// Lazy‑load an iframe: set src from data-src, then play after readiness or fallback
-function lazyLoadIframe(iframe, playAfterLoad = true) {
-    if (!iframe) return;
-    const dataSrc = iframe.dataset.src;
-    if (!dataSrc) return;
+// ============ NEW: Video placeholder and dynamic loading ============
 
-    // Only set src if it hasn't been set already
-    if (iframe.src !== dataSrc) {
-        iframe.src = dataSrc;
-        if (playAfterLoad) {
-            // Flag that we want to play once ready
-            iframe._playQueued = true;
-
-            // Fallback: try to play after 1.5 seconds if onReady never fires
-            setTimeout(() => {
-                if (iframe._playQueued) {
-                    controlIframePlayback(iframe, true);
-                    iframe._playQueued = false;
-                }
-            }, 1500);
-        }
-    } else {
-        // src already set; just play if needed
-        if (playAfterLoad) {
-            // Assume player is ready, but also queue in case it's not
-            iframe._playQueued = true;
-            controlIframePlayback(iframe, true);
-            // Also set a short fallback in case the player wasn't ready
-            setTimeout(() => {
-                if (iframe._playQueued) {
-                    controlIframePlayback(iframe, true);
-                    iframe._playQueued = false;
-                }
-            }, 500);
-        }
+// Create a lightweight placeholder (thumbnail + controls)
+function generateVideoSlide(img) {
+    const videoId = extractYouTubeId(img.url);
+    if (!videoId) {
+        return `
+            <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
+                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; color:#fff;">
+                    Invalid YouTube URL
+                </div>
+            </div>
+        `;
     }
+
+    // Get control position from localStorage
+    const pos = localStorage.getItem('vidvids_control_position') || 'right';
+    const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
+
+    // Thumbnail URL (use medium quality to save data)
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+
+    return `
+        <div class="swiper-slide" data-type="video" data-video-id="${videoId}" data-url="${escapeHtml(img.url)}">
+            <div class="video-placeholder" style="width:100%; height:100%; background:#000; display:flex; align-items:center; justify-content:center; position:relative;">
+                <img src="${thumbnailUrl}" alt="Video thumbnail" loading="lazy"
+                     style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">
+                <div style="position:relative; z-index:2; background:rgba(0,0,0,0.4); border-radius:50%; padding:12px; pointer-events:none;">
+                    <span style="font-size:48px; color:white;">▶</span>
+                </div>
+                <!-- The iframe will be inserted here when slide becomes active -->
+                <div class="video-iframe-container" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
+            </div>
+            <div class="video-controls ${controlsClass}">
+                <button class="gift-icon-btn video-gift-btn" aria-label="Send Gift">🎁</button>
+                <button class="video-up-btn">⬆️</button>
+                <button class="video-down-btn">⬇️</button>
+            </div>
+        </div>
+    `;
 }
 
-// Manage video playback for the active slide and clean up inactive ones
-function manageVideoPlayback(swiperInstance) {
-    if (!swiperInstance) return;
-    initYouTubeMessageListener(); // ensure listener is active
-
-    const slides = swiperInstance.slides;
-    const activeIndex = swiperInstance.activeIndex;
-
-    slides.forEach((slide, idx) => {
-        const iframe = slide.querySelector('iframe');
-        if (!iframe) return;
-        const isActive = (idx === activeIndex);
-        if (isActive) {
-            // Active: load if needed and play
-            lazyLoadIframe(iframe, true);
-        } else {
-            // Inactive: pause and unload to save data
-            controlIframePlayback(iframe, false);
-            // Remove src to free network resources (will be reloaded from data-src when active)
-            // We store the original src in data-src (already there)
-            if (iframe.src) {
-                iframe.src = ''; // unload
-                iframe._playQueued = false; // reset flag
-            }
-        }
-    });
-}
-
-async function fetchRandomImages(category = state.currentCategory, search = "", retryCount = 0) {
-    if (state.isLoadingMore) return [];
-    state.isLoadingMore = true;
-    showLoadingSpinner();
-    try {
-        let url = `${API_URL}/media/random?limit=${PAGE_SIZE}`;
-        if (category && category !== "Discover") url += `&category=${encodeURIComponent(category)}`;
-        if (search && search.trim()) url += `&search=${encodeURIComponent(search.trim())}`;
-        const res = await fetch(url);
-        let newImages = await res.json();
-        if (!newImages || newImages.length === 0) {
-            state.hasMoreImages = false;
-            return [];
-        }
-        
-        const isSearchActive = search && search.trim().length > 0;
-        let seenHistory = new Set();
-        if (!isSearchActive) {
-            seenHistory = new Set(getSeenList());
-        }
-        
-        const filtered = newImages.filter(img => 
-            !state.sessionSeenUrls.has(img.url) && !seenHistory.has(img.url)
-        );
-        
-        if (filtered.length < 10 && retryCount < MAX_RETRIES) {
-            const more = await fetchRandomImages(category, search, retryCount + 1);
-            const combined = [...filtered, ...more];
-            const uniqueCombined = [];
-            const seenSet = new Set();
-            for (const img of combined) {
-                if (!seenSet.has(img.url) && !state.sessionSeenUrls.has(img.url) && !seenHistory.has(img.url)) {
-                    seenSet.add(img.url);
-                    uniqueCombined.push(img);
-                }
-            }
-            return uniqueCombined;
-        }
-        
-        filtered.forEach(img => state.sessionSeenUrls.add(img.url));
-        return filtered;
-    } catch (e) {
-        console.error("Error fetching random videos:", e);
-        return [];
-    } finally {
-        state.isLoadingMore = false;
-        hideLoadingSpinner();
+// Extract video ID from URL (reused)
+function extractYouTubeId(url) {
+    const patterns = [
+        /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/,
+        /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)/,
+        /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/
+    ];
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) return match[1];
     }
+    return null;
 }
 
 function escapeHtml(str) {
@@ -209,44 +141,75 @@ function escapeHtml(str) {
     });
 }
 
-// === UPDATED: generateVideoSlide with data-src and lazy attributes ===
-function generateVideoSlide(img) {
-    const embedUrl = getYouTubeEmbedUrl(img.url);
-    if (!embedUrl) {
-        return `
-            <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
-                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; color:#fff;">
-                    Invalid YouTube URL
-                </div>
-            </div>
-        `;
-    }
+// Manage video playback for the active slide and clean up inactive ones
+function manageVideoPlayback(swiperInstance) {
+    if (!swiperInstance) return;
+    initYouTubeMessageListener();
 
-    // Get current control position from localStorage (default 'right')
-    const pos = localStorage.getItem('vidvids_control_position') || 'right';
-    const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
+    const slides = swiperInstance.slides;
+    const activeIndex = swiperInstance.activeIndex;
 
-    return `
-        <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
-            <iframe 
-                data-src="${embedUrl}" 
-                src="" 
-                loading="lazy" 
-                preload="none"
-                frameborder="0" 
-                allow="autoplay; encrypted-media; picture-in-picture; web-share" 
-                allowfullscreen
-                style="width:100%; height:100%; border:none;">
-            </iframe>
-            <div class="video-controls ${controlsClass}">
-                <button class="gift-icon-btn video-gift-btn" aria-label="Send Gift">🎁</button>
-                <button class="video-up-btn">⬆️</button>
-                <button class="video-down-btn">⬇️</button>
-            </div>
-        </div>
-    `;
+    slides.forEach((slide, idx) => {
+        const isActive = (idx === activeIndex);
+        const container = slide.querySelector('.video-iframe-container');
+        if (!container) return;
+
+        if (isActive) {
+            // Active: load the iframe if not already present
+            let iframe = container.querySelector('iframe');
+            if (!iframe) {
+                const videoId = slide.dataset.videoId;
+                if (!videoId) return;
+                const embedUrl = getYouTubeEmbedUrl(`https://youtu.be/${videoId}`);
+                if (!embedUrl) return;
+
+                iframe = document.createElement('iframe');
+                iframe.src = embedUrl;
+                iframe.loading = 'lazy';
+                iframe.preload = 'none';
+                iframe.frameborder = '0';
+                iframe.allow = 'autoplay; encrypted-media; picture-in-picture; web-share';
+                iframe.allowFullscreen = true;
+                iframe.style.cssText = 'width:100%; height:100%; border:none; position:absolute; top:0; left:0; z-index:1;';
+                container.appendChild(iframe);
+
+                // Hide the thumbnail after iframe loads (optional: use 'load' event)
+                const placeholder = slide.querySelector('.video-placeholder img');
+                if (placeholder) {
+                    placeholder.style.opacity = '0';
+                    placeholder.style.transition = 'opacity 0.3s';
+                }
+
+                // Flag to play when ready
+                iframe._playQueued = true;
+                // Fallback: try to play after 1.5 seconds if onReady doesn't fire
+                setTimeout(() => {
+                    if (iframe._playQueued) {
+                        controlIframePlayback(iframe, true);
+                        iframe._playQueued = false;
+                    }
+                }, 1500);
+            } else {
+                // Iframe already exists, just play
+                controlIframePlayback(iframe, true);
+            }
+        } else {
+            // Inactive: pause and remove iframe to free resources
+            const iframe = container.querySelector('iframe');
+            if (iframe) {
+                controlIframePlayback(iframe, false);
+                iframe.remove();
+                // Show thumbnail again
+                const placeholder = slide.querySelector('.video-placeholder img');
+                if (placeholder) {
+                    placeholder.style.opacity = '1';
+                }
+            }
+        }
+    });
 }
 
+// ---------- Ad slide (unchanged) ----------
 function generateAdSlide(ad, adIndex) {
     return `
         <div class="swiper-slide" data-type="ad" data-ad-index="${adIndex}">
@@ -262,6 +225,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
+// Render slides (unchanged except using new generateVideoSlide)
 function renderSlides(slides) {
     const feed = document.getElementById('feed');
     if (!feed) return;
@@ -288,15 +252,21 @@ function renderSlides(slides) {
         observer: true,
         observeParents: true,
         on: {
-            reachEnd: async () => {
-                if (state.activeSearchQuery) return;
-                if (!state.hasMoreImages || state.isLoadingMore) return;
-                await loadMoreImages(true);
-            },
             slideChange: function () {
                 pauseAllVideos();
                 manageVideoPlayback(this);
 
+                // Check if we are near the end and need to load more
+                const totalSlides = this.slides.length;
+                const activeIndex = this.activeIndex;
+                // Load more when within 2 slides of the end
+                if (activeIndex >= totalSlides - 2) {
+                    if (!state.activeSearchQuery && state.hasMoreImages && !state.isLoadingMore) {
+                        loadMoreImages(true);
+                    }
+                }
+
+                // Ad frequency logic (unchanged)
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
                     if (state.imagesShownSinceLastAd >= 15) {
@@ -314,7 +284,7 @@ function renderSlides(slides) {
         }
     });
 
-    // Attach event listeners for up/down buttons (delegation on feed)
+    // Attach event listeners for up/down buttons (delegation on feed) – unchanged
     feed.addEventListener('click', function(e) {
         const target = e.target.closest('.video-up-btn, .video-down-btn');
         if (!target) return;
@@ -335,6 +305,8 @@ function renderSlides(slides) {
         if (state.activeSwiper) state.activeSwiper.update();
     }, 100);
 }
+
+// ---------- fetch, load, append functions (mostly unchanged, but use new render) ----------
 
 export async function loadMoreImages(preservePosition = false) {
     if (state.isLoadingMore || !state.hasMoreImages) return;
@@ -400,7 +372,7 @@ export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
 }
 
-// Helper to append more images (kept as is)
+// Helper to append more images (updated to use new slide generation)
 async function appendMoreImages(newImages) {
     if (!state.activeSwiper || newImages.length === 0) return false;
 
@@ -430,7 +402,57 @@ async function appendMoreImages(newImages) {
     state.allImages.push(...newImages);
     newImages.forEach(img => state.sessionSeenUrls.add(img.url));
 
-    // Manage playback for the newly added slides (the active slide may not be one of them)
-    // We'll rely on slideChange events to handle them when they become active.
+    // The slideChange event will handle loading videos as they become active
     return true;
-                           }
+}
+
+// ---- fetchRandomImages (unchanged) ----
+async function fetchRandomImages(category = state.currentCategory, search = "", retryCount = 0) {
+    if (state.isLoadingMore) return [];
+    state.isLoadingMore = true;
+    showLoadingSpinner();
+    try {
+        let url = `${API_URL}/media/random?limit=${PAGE_SIZE}`;
+        if (category && category !== "Discover") url += `&category=${encodeURIComponent(category)}`;
+        if (search && search.trim()) url += `&search=${encodeURIComponent(search.trim())}`;
+        const res = await fetch(url);
+        let newImages = await res.json();
+        if (!newImages || newImages.length === 0) {
+            state.hasMoreImages = false;
+            return [];
+        }
+        
+        const isSearchActive = search && search.trim().length > 0;
+        let seenHistory = new Set();
+        if (!isSearchActive) {
+            seenHistory = new Set(getSeenList());
+        }
+        
+        const filtered = newImages.filter(img => 
+            !state.sessionSeenUrls.has(img.url) && !seenHistory.has(img.url)
+        );
+        
+        if (filtered.length < 10 && retryCount < MAX_RETRIES) {
+            const more = await fetchRandomImages(category, search, retryCount + 1);
+            const combined = [...filtered, ...more];
+            const uniqueCombined = [];
+            const seenSet = new Set();
+            for (const img of combined) {
+                if (!seenSet.has(img.url) && !state.sessionSeenUrls.has(img.url) && !seenHistory.has(img.url)) {
+                    seenSet.add(img.url);
+                    uniqueCombined.push(img);
+                }
+            }
+            return uniqueCombined;
+        }
+        
+        filtered.forEach(img => state.sessionSeenUrls.add(img.url));
+        return filtered;
+    } catch (e) {
+        console.error("Error fetching random videos:", e);
+        return [];
+    } finally {
+        state.isLoadingMore = false;
+        hideLoadingSpinner();
+    }
+    }
