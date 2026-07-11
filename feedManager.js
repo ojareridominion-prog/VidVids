@@ -42,27 +42,81 @@ function controlIframePlayback(iframe, shouldPlay) {
         JSON.stringify({ event: 'command', func: command, args: '' }),
         '*'
     );
+    // If we just played, clear the queue flag (if any)
+    if (shouldPlay && iframe._playQueued) {
+        iframe._playQueued = false;
+    }
 }
 
-// Lazy‑load an iframe: set src from data-src, then play after a short delay
+// ---------- NEW: YouTube message listener for onReady ----------
+let youtubeListenerInitialized = false;
+
+function initYouTubeMessageListener() {
+    if (youtubeListenerInitialized) return;
+    youtubeListenerInitialized = true;
+
+    window.addEventListener('message', function(event) {
+        // Only accept messages from YouTube
+        if (event.origin !== 'https://www.youtube.com') return;
+
+        try {
+            const data = JSON.parse(event.data);
+            // Listen for the "onReady" event
+            if (data.event === 'onReady') {
+                // Find which iframe sent this message
+                const iframes = document.querySelectorAll('iframe');
+                for (const iframe of iframes) {
+                    if (iframe.contentWindow === event.source) {
+                        const slide = iframe.closest('.swiper-slide');
+                        // Only play if this is the active slide and we have a pending play
+                        if (slide && slide.classList.contains('swiper-slide-active') && iframe._playQueued) {
+                            controlIframePlayback(iframe, true);
+                            iframe._playQueued = false;
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore malformed messages
+        }
+    });
+}
+
+// Lazy‑load an iframe: set src from data-src, then play after readiness or fallback
 function lazyLoadIframe(iframe, playAfterLoad = true) {
     if (!iframe) return;
     const dataSrc = iframe.dataset.src;
     if (!dataSrc) return;
+
     // Only set src if it hasn't been set already
     if (iframe.src !== dataSrc) {
         iframe.src = dataSrc;
-        // Once loaded, if playAfterLoad, send play command
         if (playAfterLoad) {
-            // Use a small timeout to allow the player to initialize
+            // Flag that we want to play once ready
+            iframe._playQueued = true;
+
+            // Fallback: try to play after 1.5 seconds if onReady never fires
             setTimeout(() => {
-                controlIframePlayback(iframe, true);
-            }, 300);
+                if (iframe._playQueued) {
+                    controlIframePlayback(iframe, true);
+                    iframe._playQueued = false;
+                }
+            }, 1500);
         }
     } else {
         // src already set; just play if needed
         if (playAfterLoad) {
+            // Assume player is ready, but also queue in case it's not
+            iframe._playQueued = true;
             controlIframePlayback(iframe, true);
+            // Also set a short fallback in case the player wasn't ready
+            setTimeout(() => {
+                if (iframe._playQueued) {
+                    controlIframePlayback(iframe, true);
+                    iframe._playQueued = false;
+                }
+            }, 500);
         }
     }
 }
@@ -70,6 +124,8 @@ function lazyLoadIframe(iframe, playAfterLoad = true) {
 // Manage video playback for the active slide and clean up inactive ones
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
+    initYouTubeMessageListener(); // ensure listener is active
+
     const slides = swiperInstance.slides;
     const activeIndex = swiperInstance.activeIndex;
 
@@ -87,6 +143,7 @@ function manageVideoPlayback(swiperInstance) {
             // We store the original src in data-src (already there)
             if (iframe.src) {
                 iframe.src = ''; // unload
+                iframe._playQueued = false; // reset flag
             }
         }
     });
@@ -376,4 +433,4 @@ async function appendMoreImages(newImages) {
     // Manage playback for the newly added slides (the active slide may not be one of them)
     // We'll rely on slideChange events to handle them when they become active.
     return true;
-    }
+                           }
