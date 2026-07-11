@@ -4,12 +4,13 @@ import { getSeenList, showLoadingSpinner, hideLoadingSpinner } from './utils.js'
 import { buildSlides, showMonetagInterstitial } from './adsManager.js';
 
 const API_URL = "https://vidvids.onrender.com";
-const PAGE_SIZE = 12; // Reduced from 30 to save data
+const PAGE_SIZE = 12; // Reduced from 30 to save data on initial load
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
 // Helper: convert YouTube URL to embedded player URL with autoplay initially OFF
 // Removed loop=1 and playlist= to avoid reloading on loop
+// Added enablejsapi=1 for full JavaScript control
 function getYouTubeEmbedUrl(url) {
     let videoId = '';
     const patterns = [
@@ -57,7 +58,7 @@ function seekToIframe(iframe, seconds) {
     );
 }
 
-// ---------- YouTube message listener for onReady and onStateChange ----------
+// ---------- YouTube message listener for onReady, onStateChange, and infoDelivery ----------
 let youtubeListenerInitialized = false;
 
 function initYouTubeMessageListener() {
@@ -84,42 +85,50 @@ function initYouTubeMessageListener() {
                 }
             }
 
-            // ---- onStateChange ----
+            // ---- onStateChange (legacy) ----
             if (data.event === 'onStateChange') {
-                // Support both possible data structures
                 let stateCode = data.info?.playerState;
                 if (stateCode === undefined) stateCode = data.playerState;
-                if (stateCode === undefined) return; // not a state change we can interpret
-
-                // 0 = ENDED → loop seamlessly
                 if (stateCode === 0) {
-                    const iframes = document.querySelectorAll('iframe');
-                    for (const iframe of iframes) {
-                        if (iframe.contentWindow === event.source) {
-                            const slide = iframe.closest('.swiper-slide');
-                            // Only loop if this is the active slide (avoid background noise)
-                            if (slide && slide.classList.contains('swiper-slide-active')) {
-                                // Seek to start and play – uses cached buffer, no reload
-                                // We do it immediately, but if the player hasn't finished unloading,
-                                // we retry after a short delay to ensure the command is accepted.
-                                const doLoop = () => {
-                                    seekToIframe(iframe, 0);
-                                    controlIframePlayback(iframe, true);
-                                };
-                                doLoop();
-                                // Safety net: if the first attempt doesn't work, try again after 200ms
-                                setTimeout(doLoop, 200);
-                            }
-                            break;
-                        }
-                    }
+                    handleVideoEnded(event.source);
+                }
+            }
+
+            // ---- infoDelivery (more reliable for modern players) ----
+            if (data.event === 'infoDelivery' && data.info) {
+                const stateCode = data.info.playerState;
+                if (stateCode === 0) {
+                    handleVideoEnded(event.source);
                 }
             }
         } catch (e) { /* ignore malformed messages */ }
     });
 }
 
-// ============ NEW: Video placeholder and dynamic loading ============
+// Helper: handle the ENDED state – seek to 0 and play from cache
+function handleVideoEnded(sourceWindow) {
+    const iframes = document.querySelectorAll('iframe');
+    for (const iframe of iframes) {
+        if (iframe.contentWindow === sourceWindow) {
+            const slide = iframe.closest('.swiper-slide');
+            // Only loop if this is the active slide (avoid background noise)
+            if (slide && slide.classList.contains('swiper-slide-active')) {
+                // Seek to start and play – uses cached buffer, no reload
+                // Do it immediately, but also schedule a retry in case the player isn't ready
+                const doLoop = () => {
+                    seekToIframe(iframe, 0);
+                    controlIframePlayback(iframe, true);
+                };
+                doLoop();
+                // Safety net: if the first attempt doesn't take, try again after 200ms
+                setTimeout(doLoop, 200);
+            }
+            break;
+        }
+    }
+}
+
+// ============ Video placeholder and dynamic loading ============
 
 // Create a lightweight placeholder (thumbnail + controls)
 function generateVideoSlide(img) {
@@ -235,16 +244,13 @@ function manageVideoPlayback(swiperInstance) {
                 controlIframePlayback(iframe, true);
             }
         } else {
-            // Inactive: pause and remove iframe to free resources
+            // Inactive: pause the video but DO NOT remove the iframe
+            // This preserves the cached video and prevents reloading when scrolling back
             const iframe = container.querySelector('iframe');
             if (iframe) {
                 controlIframePlayback(iframe, false);
-                iframe.remove();
-                // Show thumbnail again
-                const placeholder = slide.querySelector('.video-placeholder img');
-                if (placeholder) {
-                    placeholder.style.opacity = '1';
-                }
+                // Keep the thumbnail hidden because the iframe is still there
+                // but we can show a semi-transparent overlay if needed
             }
         }
     });
@@ -496,4 +502,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-            }
+        }
