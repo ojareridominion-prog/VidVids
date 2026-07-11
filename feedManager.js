@@ -44,13 +44,13 @@ function controlIframePlayback(iframe, shouldPlay) {
     );
 }
 
-// Lazy‑load an iframe: set src from data-src and play after load
+// Lazy‑load an iframe: set src from data-src, enable autoplay, and play after load
 function lazyLoadIframe(iframe, playAfterLoad = true) {
     if (!iframe) return;
-    const dataSrc = iframe.dataset.src;
+    let dataSrc = iframe.dataset.src;
     if (!dataSrc) return;
 
-    // If src is already set (non‑empty), just play/pause if needed
+    // If src already set, just play/pause if needed
     if (iframe.src && iframe.src !== '') {
         if (playAfterLoad) {
             controlIframePlayback(iframe, true);
@@ -58,23 +58,27 @@ function lazyLoadIframe(iframe, playAfterLoad = true) {
         return;
     }
 
-    // First load: set src and wait for load event
-    iframe.src = dataSrc;
+    // Modify URL: set autoplay=1 if we want it to play automatically
     if (playAfterLoad) {
-        // Attach one‑time load listener
-        const onLoad = () => {
-            iframe.removeEventListener('load', onLoad);
+        dataSrc = dataSrc.replace(/autoplay=0/, 'autoplay=1');
+    }
+
+    // Attach onload handler before setting src to ensure it fires
+    if (playAfterLoad) {
+        iframe.onload = function() {
+            // Once loaded, send play command as a backup
             controlIframePlayback(iframe, true);
         };
-        iframe.addEventListener('load', onLoad);
-        // Fallback: if load never fires, try after 1 second
+        // Fallback: if load never fires (e.g., cached), try after 1.5s
         setTimeout(() => {
             if (iframe.src === dataSrc) {
-                // If still loading, try to play anyway
                 controlIframePlayback(iframe, true);
             }
-        }, 1000);
+        }, 1500);
     }
+
+    // Set the src (triggers loading)
+    iframe.src = dataSrc;
 }
 
 // Manage video playback for the active slide and clean up inactive ones
