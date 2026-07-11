@@ -151,7 +151,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// === manageVideoPlayback – lazy load with src rewrite + postMessage fallback ===
+// === manageVideoPlayback – lazy load with src rewrite autoplay=1 (no postMessage for initial play) ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -171,19 +171,16 @@ function manageVideoPlayback(swiperInstance) {
                 const srcWithAutoplay = dataSrc.replace(/autoplay=\d/, 'autoplay=1');
                 iframe.src = srcWithAutoplay;
 
-                // Fallback: send play command after onload and after a delay
-                const playFallback = () => {
-                    playIframeVideo(iframe);
-                };
-                iframe.onload = playFallback;
-                setTimeout(playFallback, 1000); // longer delay to ensure player is ready
+                // DO NOT send postMessage here – autoplay=1 handles it.
+                // No onload or setTimeout needed – autoplay is reliable with user gesture (swipe)
             }
         }
 
         // 2. For already-loaded iframes, control play/pause via postMessage (no src changes)
         if (iframe.src) {
             if (isActive) {
-                playIframeVideo(iframe); // ensure it's playing
+                // If it's already loaded but paused, ensure it plays (redundant but safe)
+                playIframeVideo(iframe);
             } else {
                 if (iframe.contentWindow) {
                     iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
@@ -226,7 +223,6 @@ async function appendMoreImages(newImages) {
     return true;
 }
 
-// === renderSlides: creates Swiper and sets up one-time click listener ===
 function renderSlides(slides) {
     const feed = document.getElementById('feed');
     if (!feed) return;
@@ -278,7 +274,7 @@ function renderSlides(slides) {
         }
     });
 
-    // Ensure the click listener is attached only once (using a flag)
+    // Attach event listeners for up/down buttons (delegation on feed) – only once
     if (!feed._listenerAttached) {
         feed.addEventListener('click', function(e) {
             const target = e.target.closest('.video-up-btn, .video-down-btn');
@@ -365,4 +361,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-                                                 }
+}
