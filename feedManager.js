@@ -151,7 +151,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// === manageVideoPlayback – lazy load, no src rewriting ===
+// === manageVideoPlayback – lazy load with src rewrite + postMessage fallback ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -163,26 +163,24 @@ function manageVideoPlayback(swiperInstance) {
 
         const isActive = (idx === activeIndex);
 
-        // 1. Lazy-load: if active and src is empty, load from data-src
+        // 1. Lazy-load: if active and src is empty, load from data-src with autoplay=1
         if (isActive && !iframe.src) {
             const dataSrc = iframe.dataset.src;
             if (dataSrc) {
-                // Add autoplay=1 to start playing immediately
+                // Replace autoplay=0 with autoplay=1 to force immediate playback
                 const srcWithAutoplay = dataSrc.replace(/autoplay=\d/, 'autoplay=1');
                 iframe.src = srcWithAutoplay;
 
-                // Ensure it starts playing – fallback if autoplay is blocked
+                // Fallback: send play command after onload and after a delay
                 const playFallback = () => {
                     playIframeVideo(iframe);
                 };
-                // Use onload as primary trigger
                 iframe.onload = playFallback;
-                // Also try after 800ms in case onload doesn't fire
-                setTimeout(playFallback, 800);
+                setTimeout(playFallback, 1000); // longer delay to ensure player is ready
             }
         }
 
-        // 2. For already-loaded iframes, control play/pause via postMessage
+        // 2. For already-loaded iframes, control play/pause via postMessage (no src changes)
         if (iframe.src) {
             if (isActive) {
                 playIframeVideo(iframe); // ensure it's playing
@@ -228,6 +226,7 @@ async function appendMoreImages(newImages) {
     return true;
 }
 
+// === renderSlides: creates Swiper and sets up one-time click listener ===
 function renderSlides(slides) {
     const feed = document.getElementById('feed');
     if (!feed) return;
@@ -279,22 +278,25 @@ function renderSlides(slides) {
         }
     });
 
-    // Attach event listeners for up/down buttons (delegation on feed)
-    feed.addEventListener('click', function(e) {
-        const target = e.target.closest('.video-up-btn, .video-down-btn');
-        if (!target) return;
-        e.preventDefault();
-        e.stopPropagation();
+    // Ensure the click listener is attached only once (using a flag)
+    if (!feed._listenerAttached) {
+        feed.addEventListener('click', function(e) {
+            const target = e.target.closest('.video-up-btn, .video-down-btn');
+            if (!target) return;
+            e.preventDefault();
+            e.stopPropagation();
 
-        const swiper = state.activeSwiper;
-        if (!swiper) return;
+            const swiper = state.activeSwiper;
+            if (!swiper) return;
 
-        if (target.classList.contains('video-up-btn')) {
-            swiper.slidePrev();
-        } else if (target.classList.contains('video-down-btn')) {
-            swiper.slideNext();
-        }
-    });
+            if (target.classList.contains('video-up-btn')) {
+                swiper.slidePrev();
+            } else if (target.classList.contains('video-down-btn')) {
+                swiper.slideNext();
+            }
+        });
+        feed._listenerAttached = true;
+    }
 
     setTimeout(() => {
         if (state.activeSwiper) state.activeSwiper.update();
@@ -363,4 +365,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-}
+                                                 }
