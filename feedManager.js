@@ -100,7 +100,7 @@ function escapeHtml(str) {
     });
 }
 
-// === UPDATED: generateVideoSlide with controls ===
+// === UPDATED: generateVideoSlide with lazy-load iframe ===
 function generateVideoSlide(img) {
     const embedUrl = getYouTubeEmbedUrl(img.url);
     if (!embedUrl) {
@@ -117,10 +117,14 @@ function generateVideoSlide(img) {
     const pos = localStorage.getItem('vidvids_control_position') || 'right';
     const controlsClass = pos === 'left' ? 'controls-left' : 'controls-right';
 
+    // Store the full URL in data-src, leave src empty initially
+    const finalUrl = embedUrl; // already has autoplay=0
+
     return `
         <div class="swiper-slide" data-type="video" data-url="${escapeHtml(img.url)}">
             <iframe 
-                src="${embedUrl}" 
+                data-src="${finalUrl}" 
+                src="" 
                 frameborder="0" 
                 allow="autoplay; encrypted-media; picture-in-picture; web-share" 
                 allowfullscreen
@@ -150,7 +154,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// Manage video playback (unchanged)
+// === UPDATED: Manage video playback using postMessage and lazy loading ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -159,15 +163,27 @@ function manageVideoPlayback(swiperInstance) {
     slides.forEach((slide, idx) => {
         const iframe = slide.querySelector('iframe');
         if (!iframe) return;
-        let src = iframe.src;
-        const shouldPlay = (idx === activeIndex);
-        if (shouldPlay) {
-            if (!src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=1');
+
+        const isActive = (idx === activeIndex);
+
+        // 1. Lazy-load: if active and src is empty, load from data-src
+        if (isActive && !iframe.src) {
+            const dataSrc = iframe.dataset.src;
+            if (dataSrc) {
+                iframe.src = dataSrc; // loads with autoplay=0
+                // After a short delay, start playing
+                setTimeout(() => playIframeVideo(iframe), 300);
             }
-        } else {
-            if (src.includes('autoplay=1')) {
-                iframe.src = src.replace(/autoplay=\d/, 'autoplay=0');
+        }
+
+        // 2. For already-loaded iframes, control play/pause via postMessage
+        if (iframe.src) {
+            if (isActive) {
+                playIframeVideo(iframe);
+            } else {
+                if (iframe.contentWindow) {
+                    iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+                }
             }
         }
     });
