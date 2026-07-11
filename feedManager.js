@@ -154,7 +154,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// === UPDATED: Manage video playback using postMessage and lazy loading ===
+// === UPDATED: Robust manageVideoPlayback with onload and fallback ===
 function manageVideoPlayback(swiperInstance) {
     if (!swiperInstance) return;
     const slides = swiperInstance.slides;
@@ -171,14 +171,22 @@ function manageVideoPlayback(swiperInstance) {
             const dataSrc = iframe.dataset.src;
             if (dataSrc) {
                 iframe.src = dataSrc; // loads with autoplay=0
-                // After a short delay, start playing
-                setTimeout(() => playIframeVideo(iframe), 300);
+                // Use onload to play once loaded
+                iframe.onload = function() {
+                    playIframeVideo(iframe);
+                    iframe.onload = null; // prevent repeated calls
+                };
+                // Fallback: if onload doesn't fire, try after 1 second
+                setTimeout(() => {
+                    if (iframe.src) playIframeVideo(iframe);
+                }, 1000);
             }
         }
 
         // 2. For already-loaded iframes, control play/pause via postMessage
         if (iframe.src) {
             if (isActive) {
+                // If it's already loaded but paused, play
                 playIframeVideo(iframe);
             } else {
                 if (iframe.contentWindow) {
@@ -273,7 +281,7 @@ function renderSlides(slides) {
                 if (activeSlide) {
                     const iframe = activeSlide.querySelector('iframe');
                     if (iframe) {
-                        setTimeout(() => playIframeVideo(iframe), 100);
+                        // Already handled in manageVideoPlayback
                     }
                 }
             }
@@ -364,4 +372,4 @@ export async function resetAndLoadFeed(cat, search = "", skipAd = false) {
 
 export async function loadFeed(cat, search = "", skipAd = false) {
     await resetAndLoadFeed(cat, search, skipAd);
-        }
+                           }
