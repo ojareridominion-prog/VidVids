@@ -74,7 +74,7 @@ function getVideoTime(iframe) {
         const handler = (event) => {
             if (event.origin !== 'https://www.youtube.com') return;
             try {
-                const data = JSON.parse(event.data);
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
                 if (data.event === 'infoDelivery' && data.info) {
                     const currentTime = data.info.currentTime;
                     const duration = data.info.duration;
@@ -103,7 +103,7 @@ function getVideoTime(iframe) {
     });
 }
 
-// ---------- YouTube message listener - simplified (no YT.Player) ----------
+// ---------- YouTube message listener - robust extraction of stateCode ----------
 let youtubeListenerInitialized = false;
 let activeLoopPollInterval = null;
 let activePollingIframe = null;
@@ -116,7 +116,9 @@ function initYouTubeMessageListener() {
     window.addEventListener('message', function(event) {
         if (event.origin !== 'https://www.youtube.com') return;
         try {
-            const data = JSON.parse(event.data);
+            // Handle cases where event.data might arrive as a raw string
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            if (!data) return;
 
             // Find the iframe that sent this event
             const iframes = document.querySelectorAll('iframe');
@@ -142,9 +144,19 @@ function initYouTubeMessageListener() {
                 }
             }
 
-            // ---- onStateChange (legacy) or infoDelivery ----
-            let stateCode = data.info?.playerState ?? data.playerState;
-            if (stateCode === 0 || (data.event === 'onStateChange' && data.info === 0)) {
+            // ---- Handle State Changes (Looking for Ended = 0) ----
+            let stateCode = null;
+            
+            if (data.event === 'onStateChange') {
+                stateCode = data.info;
+            } else if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
+                stateCode = data.info.playerState;
+            } else if (data.playerState !== undefined) {
+                stateCode = data.playerState;
+            }
+
+            // stateCode 0 is officially "ENDED"
+            if (stateCode === 0) {
                 const slide = targetIframe.closest('.swiper-slide');
                 if (slide && slide.classList.contains('swiper-slide-active')) {
                     performLoop(targetIframe);
@@ -598,4 +610,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-            }
+}
