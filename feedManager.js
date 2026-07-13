@@ -36,12 +36,14 @@ function pauseAllVideos() {
     }
 }
 
-// Send play/pause commands via postMessage with required 'id' parameter
+// Send play/pause commands via postMessage with dynamic 'id' parameter
 function controlIframePlayback(iframe, shouldPlay) {
     if (!iframe || !iframe.contentWindow) return;
     const command = shouldPlay ? 'playVideo' : 'pauseVideo';
+    // Use the real player ID captured from YouTube, or fallback to 1
+    const playerId = iframe._ytPlayerId !== undefined ? iframe._ytPlayerId : 1;
     iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: command, args: '', id: 1 }),
+        JSON.stringify({ event: 'command', func: command, args: '', id: playerId }),
         '*'
     );
     if (shouldPlay && iframe._playQueued) {
@@ -49,11 +51,12 @@ function controlIframePlayback(iframe, shouldPlay) {
     }
 }
 
-// Helper: seek to a specific time in the video with required 'id' parameter
+// Helper: seek to a specific time in the video with dynamic 'id' parameter
 function seekToIframe(iframe, seconds) {
     if (!iframe || !iframe.contentWindow) return;
+    const playerId = iframe._ytPlayerId !== undefined ? iframe._ytPlayerId : 1;
     iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true], id: 1 }),
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true], id: playerId }),
         '*'
     );
 }
@@ -65,6 +68,8 @@ function getVideoTime(iframe) {
             resolve(null);
             return;
         }
+        // Use the real player ID if available
+        const playerId = iframe._ytPlayerId !== undefined ? iframe._ytPlayerId : 1;
         // We'll use a one-time message listener to capture the response
         const handler = (event) => {
             if (event.origin !== 'https://www.youtube.com') return;
@@ -81,13 +86,13 @@ function getVideoTime(iframe) {
             } catch (e) {}
         };
         window.addEventListener('message', handler);
-        // Send commands with id: 1 to get current time and duration
+        // Send commands with the correct ID
         iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '', id: 1 }),
+            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '', id: playerId }),
             '*'
         );
         iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getDuration', args: '', id: 1 }),
+            JSON.stringify({ event: 'command', func: 'getDuration', args: '', id: playerId }),
             '*'
         );
         // Timeout after 1 second
@@ -126,6 +131,10 @@ function initYouTubeMessageListener() {
 
             // ---- onReady ----
             if (data.event === 'onReady') {
+                // Capture the real player ID assigned by YouTube
+                if (data.id !== undefined) {
+                    targetIframe._ytPlayerId = data.id;
+                }
                 const slide = targetIframe.closest('.swiper-slide');
                 if (slide && slide.classList.contains('swiper-slide-active') && targetIframe._playQueued) {
                     controlIframePlayback(targetIframe, true);
@@ -589,4 +598,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-}
+            }
