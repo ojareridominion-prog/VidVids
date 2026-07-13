@@ -4,7 +4,7 @@ import { getSeenList, showLoadingSpinner, hideLoadingSpinner } from './utils.js'
 import { buildSlides, showMonetagInterstitial } from './adsManager.js';
 
 const API_URL = "https://vidvids.onrender.com";
-const PAGE_SIZE = 12; // Reduced from 30 to save data on initial load
+const PAGE_SIZE = 12; // Adjusted to 12 as requested
 const MAX_RETRIES = 3;
 const AD_FREQUENCY = 3;
 
@@ -36,12 +36,12 @@ function pauseAllVideos() {
     }
 }
 
-// Send play/pause commands via postMessage (no src rewriting)
+// Send play/pause commands via postMessage with required 'id' parameter
 function controlIframePlayback(iframe, shouldPlay) {
     if (!iframe || !iframe.contentWindow) return;
     const command = shouldPlay ? 'playVideo' : 'pauseVideo';
     iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: command, args: '' }),
+        JSON.stringify({ event: 'command', func: command, args: '', id: 1 }),
         '*'
     );
     if (shouldPlay && iframe._playQueued) {
@@ -49,11 +49,11 @@ function controlIframePlayback(iframe, shouldPlay) {
     }
 }
 
-// Helper: seek to a specific time in the video
+// Helper: seek to a specific time in the video with required 'id' parameter
 function seekToIframe(iframe, seconds) {
     if (!iframe || !iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true] }),
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true], id: 1 }),
         '*'
     );
 }
@@ -81,13 +81,13 @@ function getVideoTime(iframe) {
             } catch (e) {}
         };
         window.addEventListener('message', handler);
-        // Send command to get current time and duration
+        // Send commands with id: 1 to get current time and duration
         iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '' }),
+            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '', id: 1 }),
             '*'
         );
         iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getDuration', args: '' }),
+            JSON.stringify({ event: 'command', func: 'getDuration', args: '', id: 1 }),
             '*'
         );
         // Timeout after 1 second
@@ -98,7 +98,7 @@ function getVideoTime(iframe) {
     });
 }
 
-// ---------- YouTube message listener for onReady, onStateChange, and infoDelivery ----------
+// ---------- YouTube message listener - simplified (no YT.Player) ----------
 let youtubeListenerInitialized = false;
 let activeLoopPollInterval = null;
 let activePollingIframe = null;
@@ -113,35 +113,32 @@ function initYouTubeMessageListener() {
         try {
             const data = JSON.parse(event.data);
 
+            // Find the iframe that sent this event
+            const iframes = document.querySelectorAll('iframe');
+            let targetIframe = null;
+            for (const iframe of iframes) {
+                if (iframe.contentWindow === event.source) {
+                    targetIframe = iframe;
+                    break;
+                }
+            }
+            if (!targetIframe) return;
+
             // ---- onReady ----
             if (data.event === 'onReady') {
-                const iframes = document.querySelectorAll('iframe');
-                for (const iframe of iframes) {
-                    if (iframe.contentWindow === event.source) {
-                        const slide = iframe.closest('.swiper-slide');
-                        if (slide && slide.classList.contains('swiper-slide-active') && iframe._playQueued) {
-                            controlIframePlayback(iframe, true);
-                            iframe._playQueued = false;
-                        }
-                        break;
-                    }
+                const slide = targetIframe.closest('.swiper-slide');
+                if (slide && slide.classList.contains('swiper-slide-active') && targetIframe._playQueued) {
+                    controlIframePlayback(targetIframe, true);
+                    targetIframe._playQueued = false;
                 }
             }
 
-            // ---- onStateChange (legacy) ----
-            if (data.event === 'onStateChange') {
-                let stateCode = data.info?.playerState;
-                if (stateCode === undefined) stateCode = data.playerState;
-                if (stateCode === 0) {
-                    handleVideoEnded(event.source);
-                }
-            }
-
-            // ---- infoDelivery (more reliable for modern players) ----
-            if (data.event === 'infoDelivery' && data.info) {
-                const stateCode = data.info.playerState;
-                if (stateCode === 0) {
-                    handleVideoEnded(event.source);
+            // ---- onStateChange (legacy) or infoDelivery ----
+            let stateCode = data.info?.playerState ?? data.playerState;
+            if (stateCode === 0 || (data.event === 'onStateChange' && data.info === 0)) {
+                const slide = targetIframe.closest('.swiper-slide');
+                if (slide && slide.classList.contains('swiper-slide-active')) {
+                    performLoop(targetIframe);
                 }
             }
         } catch (e) { /* ignore malformed messages */ }
@@ -154,7 +151,6 @@ function handleVideoEnded(sourceWindow) {
     for (const iframe of iframes) {
         if (iframe.contentWindow === sourceWindow) {
             const slide = iframe.closest('.swiper-slide');
-            // Only loop if this is the active slide (avoid background noise)
             if (slide && slide.classList.contains('swiper-slide-active')) {
                 performLoop(iframe);
             }
