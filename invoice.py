@@ -16,7 +16,7 @@ async def create_invoice(request: Request):
         raise HTTPException(status_code=401, detail="Invalid user")
     try:
         invoice_link = await bot.create_invoice_link(
-            title="IMAGIFHUB Premium",
+            title="VidVids Premium",
             description="30 days of ad‑free experience",
             payload=f"premium_{user_id}",
             provider_token="",
