@@ -69,7 +69,7 @@ async def ton_manifest(request: Request):
 # Optional debug endpoint
 @app.get("/debug/ton-manifest")
 async def debug_ton_manifest():
-    return {"url": "https://imagifhub.onrender.com/ton-manifest.json", "status": "ok"}
+    return {"url": "https://vidvids.onrender.com/ton-manifest.json", "status": "ok"}
 
 # ========== INCLUDE ROUTERS ==========
 app.include_router(webhook_router)
@@ -84,7 +84,7 @@ app.include_router(ton_router)
 
 @app.get("/")
 async def root():
-    return {"status": "IMAGIFHUB API is running"}
+    return {"status": "VidVids API is running"}
 
 # ========== STARTUP EVENTS ==========
 @app.on_event("startup")
