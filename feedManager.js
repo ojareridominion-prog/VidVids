@@ -325,7 +325,8 @@ function manageVideoPlayback(swiperInstance) {
                     }
                 }, 1500);
             } else {
-                // Iframe already exists, just play
+                // Iframe already exists: seek to start and play (loop behavior)
+                seekToIframe(iframe, 0);
                 controlIframePlayback(iframe, true);
             }
             // Start polling for this iframe
@@ -574,4 +575,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-}
+    }
