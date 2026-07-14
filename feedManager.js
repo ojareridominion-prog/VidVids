@@ -406,7 +406,7 @@ function renderSlides(slides) {
                 // Ad frequency logic (unchanged)
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
-                    if (state.imagesShownSinceLastAd >= 15) {
+                    if (state.imagesShownSinceLastAd >= 6) {
                         state.imagesShownSinceLastAd = 0;
                         this.allowTouchMove = false;
                         pauseAllVideos();
