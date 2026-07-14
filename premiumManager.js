@@ -5,8 +5,8 @@ import { showRewardedAd } from './monetag.js';
 import { generateInitialsAvatar } from './utils.js';
 
 const API_URL = "https://vidvids.onrender.com";
-const TEMP_PREMIUM_KEY = "imagifhub_temp_premium_expiry";
-const TEMP_AD_COUNT_KEY = "imagifhub_temp_ad_count";
+const TEMP_PREMIUM_KEY = "vidvids_temp_premium_expiry";
+const TEMP_AD_COUNT_KEY = "vidvids_temp_ad_count";
 
 function getTempPremiumExpiry() {
     const expiry = localStorage.getItem(TEMP_PREMIUM_KEY);
@@ -318,4 +318,4 @@ function updateUserCard(user) {
         .then(response => response.ok ? response.blob() : Promise.reject())
         .then(blob => { avatarImg.src = URL.createObjectURL(blob); })
         .catch(() => { avatarImg.src = generateInitialsAvatar(user); });
-}
+        }
