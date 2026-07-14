@@ -403,14 +403,24 @@ function renderSlides(slides) {
                     }
                 }
 
-                // Ad frequency logic (unchanged)
+                // Ad frequency logic (changed from 15 to 6, and added resume)
                 if (!state.isPremiumUser) {
                     state.imagesShownSinceLastAd++;
                     if (state.imagesShownSinceLastAd >= 6) {
                         state.imagesShownSinceLastAd = 0;
                         this.allowTouchMove = false;
                         pauseAllVideos();
-                        showMonetagInterstitial().finally(() => { this.allowTouchMove = true; });
+                        showMonetagInterstitial().finally(() => {
+                            this.allowTouchMove = true;
+                            // Resume the active video after ad closes
+                            const activeSlide = this.slides[this.activeIndex];
+                            if (activeSlide) {
+                                const iframe = activeSlide.querySelector('iframe');
+                                if (iframe) {
+                                    controlIframePlayback(iframe, true);
+                                }
+                            }
+                        });
                     }
                 }
             },
@@ -575,4 +585,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-    }
+                                 }
