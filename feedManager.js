@@ -100,7 +100,7 @@ function startLoopPolling(iframe) {
         
         // Request the status update. The message event listener below will catch the response.
         requestVideoStatus(activePollingIframe);
-    }, 250);
+    }, 50);
 }
 
 function stopLoopPolling() {
