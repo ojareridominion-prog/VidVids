@@ -61,53 +61,55 @@ function seekToIframe(iframe, seconds) {
     );
 }
 
-// Helper: get current time and duration from iframe (returns promise)
-function getVideoTime(iframe) {
-    return new Promise((resolve) => {
-        if (!iframe || !iframe.contentWindow) {
-            resolve(null);
-            return;
-        }
-        // Use the real player ID if available
-        const playerId = iframe._ytPlayerId !== undefined ? iframe._ytPlayerId : 1;
-        // We'll use a one-time message listener to capture the response
-        const handler = (event) => {
-            if (event.origin !== 'https://www.youtube.com') return;
-            try {
-                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                if (data.event === 'infoDelivery' && data.info) {
-                    const currentTime = data.info.currentTime;
-                    const duration = data.info.duration;
-                    if (currentTime !== undefined && duration !== undefined) {
-                        window.removeEventListener('message', handler);
-                        resolve({ currentTime, duration });
-                    }
-                }
-            } catch (e) {}
-        };
-        window.addEventListener('message', handler);
-        // Send commands with the correct ID
-        iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getCurrentTime', args: '', id: playerId }),
-            '*'
-        );
-        iframe.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'getDuration', args: '', id: playerId }),
-            '*'
-        );
-        // Timeout after 1 second
-        setTimeout(() => {
-            window.removeEventListener('message', handler);
-            resolve(null);
-        }, 1000);
-    });
-}
-
 // ---------- YouTube message listener - robust extraction of stateCode ----------
 let youtubeListenerInitialized = false;
 let activeLoopPollInterval = null;
 let activePollingIframe = null;
 let isLooping = false; // prevent multiple loops
+
+// Helper: Ask YouTube to send us a playback status update
+function requestVideoStatus(iframe) {
+    if (!iframe || !iframe.contentWindow) return;
+    const playerId = iframe._ytPlayerId !== undefined ? iframe._ytPlayerId : 1;
+    
+    // This command forces YouTube to immediately dispatch an infoDelivery payload containing currentTime & duration
+    iframe.contentWindow.postMessage(
+        JSON.stringify({ event: 'listening', id: playerId }),
+        '*'
+    );
+}
+
+// ============ Polling fallback: check time every 250ms for a tighter loop vibe ============
+function startLoopPolling(iframe) {
+    stopLoopPolling(); // clear any existing interval
+    if (!iframe) return;
+    activePollingIframe = iframe;
+    
+    // We poll more frequently (250ms instead of 1000ms) to catch the end frame of Shorts perfectly
+    activeLoopPollInterval = setInterval(() => {
+        if (!activePollingIframe) {
+            stopLoopPolling();
+            return;
+        }
+        // Check if this iframe is still the active one
+        const slide = activePollingIframe.closest('.swiper-slide');
+        if (!slide || !slide.classList.contains('swiper-slide-active')) {
+            stopLoopPolling();
+            return;
+        }
+        
+        // Request the status update. The message event listener below will catch the response.
+        requestVideoStatus(activePollingIframe);
+    }, 250);
+}
+
+function stopLoopPolling() {
+    if (activeLoopPollInterval) {
+        clearInterval(activeLoopPollInterval);
+        activeLoopPollInterval = null;
+    }
+    activePollingIframe = null;
+}
 
 function initYouTubeMessageListener() {
     if (youtubeListenerInitialized) return;
@@ -116,7 +118,7 @@ function initYouTubeMessageListener() {
     window.addEventListener('message', function(event) {
         if (event.origin !== 'https://www.youtube.com') return;
         try {
-            // Handle cases where event.data might arrive as a raw string
+            // Handle cases where event.data arrives as a raw string
             const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             if (!data) return;
 
@@ -133,7 +135,6 @@ function initYouTubeMessageListener() {
 
             // ---- onReady ----
             if (data.event === 'onReady') {
-                // Capture the real player ID assigned by YouTube
                 if (data.id !== undefined) {
                     targetIframe._ytPlayerId = data.id;
                 }
@@ -146,7 +147,6 @@ function initYouTubeMessageListener() {
 
             // ---- Handle State Changes (Looking for Ended = 0) ----
             let stateCode = null;
-            
             if (data.event === 'onStateChange') {
                 stateCode = data.info;
             } else if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
@@ -155,11 +155,28 @@ function initYouTubeMessageListener() {
                 stateCode = data.playerState;
             }
 
-            // stateCode 0 is officially "ENDED"
             if (stateCode === 0) {
                 const slide = targetIframe.closest('.swiper-slide');
                 if (slide && slide.classList.contains('swiper-slide-active')) {
                     performLoop(targetIframe);
+                    return; // Prevent fall-through
+                }
+            }
+
+            // ---- Handle Time Tracking Polling Response ----
+            if (data.event === 'infoDelivery' && data.info) {
+                const currentTime = data.info.currentTime;
+                const duration = data.info.duration;
+                
+                // If we successfully received both metrics, evaluate if we are close to the end
+                if (currentTime !== undefined && duration !== undefined && duration > 0) {
+                    const slide = targetIframe.closest('.swiper-slide');
+                    if (slide && slide.classList.contains('swiper-slide-active')) {
+                        // If we are within 0.4 seconds of the end, force the cache-based loop
+                        if (duration - currentTime < 0.4 && currentTime > 0) {
+                            performLoop(targetIframe);
+                        }
+                    }
                 }
             }
         } catch (e) { /* ignore malformed messages */ }
@@ -194,42 +211,6 @@ function performLoop(iframe) {
     doLoop();
     // Safety net: if the first attempt doesn't take, try again after 200ms
     setTimeout(doLoop, 200);
-}
-
-// ============ Polling fallback: check time every second ============
-function startLoopPolling(iframe) {
-    stopLoopPolling(); // clear any existing interval
-    if (!iframe) return;
-    activePollingIframe = iframe;
-    activeLoopPollInterval = setInterval(async () => {
-        if (!activePollingIframe) {
-            stopLoopPolling();
-            return;
-        }
-        // Check if this iframe is still the active one
-        const slide = activePollingIframe.closest('.swiper-slide');
-        if (!slide || !slide.classList.contains('swiper-slide-active')) {
-            stopLoopPolling();
-            return;
-        }
-        // Get current time and duration
-        const info = await getVideoTime(activePollingIframe);
-        if (info && info.duration > 0) {
-            const { currentTime, duration } = info;
-            // If we're within 0.5 seconds of the end, loop
-            if (duration - currentTime < 0.5 && currentTime > 0) {
-                performLoop(activePollingIframe);
-            }
-        }
-    }, 1000);
-}
-
-function stopLoopPolling() {
-    if (activeLoopPollInterval) {
-        clearInterval(activeLoopPollInterval);
-        activeLoopPollInterval = null;
-    }
-    activePollingIframe = null;
 }
 
 // ============ Video placeholder and dynamic loading ============
@@ -610,4 +591,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-}
+            }
