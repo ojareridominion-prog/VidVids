@@ -361,7 +361,7 @@ function generateAdSlide(ad, adIndex) {
     `;
 }
 
-// Render slides (unchanged except using new generateVideoSlide)
+// Render slides (unchanged except removed the feed click listener)
 function renderSlides(slides) {
     const feed = document.getElementById('feed');
     if (!feed) return;
@@ -417,23 +417,6 @@ function renderSlides(slides) {
                 // Load and play the first active slide
                 manageVideoPlayback(this);
             }
-        }
-    });
-
-    // Attach event listeners for up/down buttons (delegation on feed) – unchanged
-    feed.addEventListener('click', function(e) {
-        const target = e.target.closest('.video-up-btn, .video-down-btn');
-        if (!target) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const swiper = state.activeSwiper;
-        if (!swiper) return;
-
-        if (target.classList.contains('video-up-btn')) {
-            swiper.slidePrev();
-        } else if (target.classList.contains('video-down-btn')) {
-            swiper.slideNext();
         }
     });
 
@@ -591,4 +574,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-    }
+}
