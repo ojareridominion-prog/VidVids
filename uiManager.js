@@ -81,30 +81,30 @@ function applyCustomTheme(baseColor) {
     document.body.style.setProperty('--bg', baseColor);
     const barColor = darkenColor(baseColor, 30);
     document.body.style.setProperty('--bar', barColor);
-    localStorage.setItem('imagifhub_custom_bg', baseColor);
-    localStorage.removeItem('imagifhub-theme');
+    localStorage.setItem('vidvids_custom_bg', baseColor);
+    localStorage.removeItem('vidvids-theme'); // legacy, keep clean
 }
 
 function setCustomAccent(color) {
     document.body.style.setProperty('--accent', color);
-    localStorage.setItem('imagifhub_custom_accent', color);
+    localStorage.setItem('vidvids_custom_accent', color);
 }
 
 function setCustomText(color) {
     document.body.style.setProperty('--text', color);
-    localStorage.setItem('imagifhub_custom_text', color);
+    localStorage.setItem('vidvids_custom_text', color);
 }
 
 function loadCustomThemeSettings() {
-    const savedBg = localStorage.getItem('imagifhub_custom_bg');
+    const savedBg = localStorage.getItem('vidvids_custom_bg');
     if (savedBg) {
         document.body.style.setProperty('--bg', savedBg);
         const barColor = darkenColor(savedBg, 30);
         document.body.style.setProperty('--bar', barColor);
     }
-    const savedAccent = localStorage.getItem('imagifhub_custom_accent');
+    const savedAccent = localStorage.getItem('vidvids_custom_accent');
     if (savedAccent) document.body.style.setProperty('--accent', savedAccent);
-    const savedText = localStorage.getItem('imagifhub_custom_text');
+    const savedText = localStorage.getItem('vidvids_custom_text');
     if (savedText) document.body.style.setProperty('--text', savedText);
 }
 
@@ -130,9 +130,9 @@ export function applyTheme(themeId) {
     applyCustomTheme(bgColor);
     
     if (themeId !== 'theme-black') {
-        localStorage.setItem('imagifhub-theme', themeId);
+        localStorage.setItem('vidvids-theme', themeId);
     } else {
-        localStorage.removeItem('imagifhub-theme');
+        localStorage.removeItem('vidvids-theme');
     }
 }
 
@@ -288,4 +288,4 @@ export function initUI() {
     loadCustomThemeSettings();
     initCustomThemeEngine();
     initMenuOverlay();
-    }
+}
