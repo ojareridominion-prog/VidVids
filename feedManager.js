@@ -173,7 +173,7 @@ function initYouTubeMessageListener() {
                     const slide = targetIframe.closest('.swiper-slide');
                     if (slide && slide.classList.contains('swiper-slide-active')) {
                         // If we are within 0.4 seconds of the end, force the cache-based loop
-                        if (duration - currentTime < 0.4 && currentTime > 0) {
+                        if (duration - currentTime < 0.2 && currentTime > 0) {
                             performLoop(targetIframe);
                         }
                     }
