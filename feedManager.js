@@ -197,20 +197,20 @@ function handleVideoEnded(sourceWindow) {
     }
 }
 
-// Perform the actual loop: seek to 0 and play
+// Perform the actual loop: seek to 0 and play cleanly once
 function performLoop(iframe) {
     if (isLooping) return;
     isLooping = true;
-    // Seek to start and play – uses cached buffer, no reload
-    const doLoop = () => {
-        seekToIframe(iframe, 0);
-        controlIframePlayback(iframe, true);
-        // Reset the flag after a short delay
-        setTimeout(() => { isLooping = false; }, 500);
-    };
-    doLoop();
-    // Safety net: if the first attempt doesn't take, try again after 200ms
-    setTimeout(doLoop, 200);
+
+    // Seek to start and play – uses cached buffer instantly
+    seekToIframe(iframe, 0);
+    controlIframePlayback(iframe, true);
+
+    // Lock looping for 800ms to allow the video to start playing 
+    // and prevent any late-arriving ended/polling events from double-triggering.
+    setTimeout(() => { 
+        isLooping = false; 
+    }, 800);
 }
 
 // ============ Video placeholder and dynamic loading ============
@@ -512,7 +512,7 @@ export async function loadFeed(cat, search = "", skipAd = false) {
 async function appendMoreImages(newImages) {
     if (!state.activeSwiper || newImages.length === 0) return false;
 
-    const swiper = state.activeSwiper;
+ const swiper = state.activeSwiper;
     const oldImageCount = state.allImages.length;
     const htmlSlides = [];
     let localAdIndex = state.currentAdIndex;
@@ -591,4 +591,4 @@ async function fetchRandomImages(category = state.currentCategory, search = "", 
         state.isLoadingMore = false;
         hideLoadingSpinner();
     }
-            }
+    }
