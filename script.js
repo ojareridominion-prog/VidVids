@@ -80,7 +80,7 @@ async function goPremium() {
     if (!tg.openInvoice) {
         statusEl.textContent = "Opening Telegram...";
         const userId = tg.initDataUnsafe?.user?.id;
-        if (userId) tg.openLink(`https://t.me/IMAGIFHUB_bot?start=premium_${userId}`);
+        if (userId) tg.openLink(`https://t.me/vidvids_bot?start=premium_${userId}`);
         return;
     }
     statusEl.textContent = "Creating invoice...";
