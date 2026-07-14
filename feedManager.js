@@ -210,7 +210,7 @@ function performLoop(iframe) {
     // and prevent any late-arriving ended/polling events from double-triggering.
     setTimeout(() => { 
         isLooping = false; 
-    }, 800);
+    }, 150);
 }
 
 // ============ Video placeholder and dynamic loading ============
