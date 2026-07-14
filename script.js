@@ -216,6 +216,29 @@ function initPremiumPaymentToggle() {
     }
 }
 
+// ---------- GLOBAL NAVIGATION BUTTON LISTENER (added only once) ----------
+function initSlideNavigation() {
+    const feed = document.getElementById('feed');
+    if (!feed) return;
+
+    // Use event delegation – this listener is attached once and never duplicated
+    feed.addEventListener('click', function(e) {
+        const target = e.target.closest('.video-up-btn, .video-down-btn');
+        if (!target) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const swiper = state.activeSwiper;
+        if (!swiper) return;
+
+        if (target.classList.contains('video-up-btn')) {
+            swiper.slidePrev();
+        } else if (target.classList.contains('video-down-btn')) {
+            swiper.slideNext();
+        }
+    });
+}
+
 async function initializeApp() {
     const tg = window.Telegram.WebApp;
     if (tg && tg.expand) tg.expand();
@@ -249,6 +272,9 @@ async function initializeApp() {
     } catch (e) { console.warn("Wallet UI init error:", e); }
 
     initOverlayMonitor(window.pauseAllVideos);
+
+    // Single, global listener for up/down navigation
+    initSlideNavigation();
 
     await verifyPremiumStatus(true);
 
