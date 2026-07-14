@@ -1,5 +1,5 @@
 // utils.js
-const SEEN_KEY = "imagifhub-seen-history";
+const SEEN_KEY = "vidvids-seen-history";
 const SEEN_LIMIT = 20;
 
 export function getSeenList() {
@@ -73,4 +73,4 @@ export function showLoadingSpinner() {
 export function hideLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) spinner.style.display = 'none';
-          }
+}
