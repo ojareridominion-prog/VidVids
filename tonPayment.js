@@ -68,7 +68,7 @@ export async function initTonConnectUI() {
         tonConnectUI = new TonConnectUIConstructor({
             manifestUrl: MANIFEST_URL,
             actionsConfiguration: {
-                twaReturnUrl: 'https://t.me/IMAGIFHUB_bot/imagifhub'
+                twaReturnUrl: 'https://t.me/vidvids_bot/vidvids'
             }
         });
         
